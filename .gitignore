@@ -1,0 +1,6 @@
+node_modules/
+.npm-cache/
+.env
+logs/
+*.log
+wordpress-plugin/*.zip

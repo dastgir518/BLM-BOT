@@ -1,0 +1,22 @@
+{
+  "name": "biolec-codex-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run check",
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/config.js && node --check src/embeddings.js && node --check src/product-sync.js && node --check src/page-sync.js && node --check src/search.js && node --check src/security.js && node --check src/codex-agent.js && node --check src/fast-agent.js && node --check src/health.js"
+  },
+  "dependencies": {
+    "@openai/codex": "^0.128.0",
+    "@openai/codex-sdk": "^0.128.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "openai": "^4.67.3",
+    "woocommerce-rest-ts-api": "^1.0.0"
+  }
+}

@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  biolec-codex-bot:
+    container_name: biolec-codex-bot
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=8787
+      - ANSWER_ENGINE=fast
+    expose:
+      - "8787"
+    networks:
+      - caddy_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  caddy_net:
+    external: true

@@ -1,0 +1,4 @@
+bot.biolecmobility.com {
+    encode gzip
+    reverse_proxy biolec-codex-bot:8787
+}
