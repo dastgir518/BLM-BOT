@@ -14,7 +14,7 @@ services:
       - PORT=8787
       - ANSWER_ENGINE=codex
     volumes:
-      - /root/.codex:/root/.codex:ro
+      - ./.codex-auth:/root/.codex
     expose:
       - "8787"
     networks:

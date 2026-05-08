@@ -4,3 +4,4 @@ node_modules/
 logs/
 *.log
 wordpress-plugin/*.zip
+.codex-auth/
