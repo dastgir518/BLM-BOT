@@ -47,13 +47,24 @@ function valueToText(value) {
   return String(value);
 }
 
+const MAX_META_FIELD_LENGTH = 900;
+const MAX_CUSTOM_META_LENGTH = 4500;
+const MAX_CHUNK_CONTENT_LENGTH = 6000;
+
+function trimText(value, maxLength) {
+  const text = String(value || "");
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trim()}...`;
+}
+
 function metaDataToText(metaData = []) {
   if (!Array.isArray(metaData)) return "";
 
   return metaData
+    .filter((item) => shouldIndexMetaKey(item?.key || item?.name || ""))
     .map((item) => {
       const key = item?.key || item?.name || "";
-      const text = valueToText(item?.value);
+      const text = trimText(stripHtml(valueToText(item?.value)), MAX_META_FIELD_LENGTH);
       return key && text ? `${key}: ${text}` : "";
     })
     .filter(Boolean)
@@ -65,12 +76,24 @@ function rawMetaToText(rawMeta = {}) {
 
   return Object.entries(rawMeta)
     .filter(([key]) => shouldIndexMetaKey(key))
+    .sort(([a], [b]) => metaPriority(a) - metaPriority(b))
     .map(([key, value]) => {
-      const text = stripHtml(valueToText(value));
+      const text = trimText(stripHtml(valueToText(value)), MAX_META_FIELD_LENGTH);
       return text ? `${key}: ${text}` : "";
     })
     .filter(Boolean)
     .join("\n");
+}
+
+function metaPriority(key = "") {
+  const normalized = String(key).toLowerCase();
+  if (normalized === "table-box") return 0;
+  if (normalized.includes("faq")) return 1;
+  if (normalized.includes("short_description")) return 2;
+  if (normalized.includes("description")) return 3;
+  if (normalized.includes("icon_title")) return 4;
+  if (normalized.includes("heading")) return 5;
+  return 10;
 }
 
 function shouldIndexMetaKey(key = "") {
@@ -123,6 +146,29 @@ function isUsefulPrivateMetaKey(key) {
     "_brand",
     "_condition"
   ].includes(key);
+}
+
+function filteredMetaData(metaData = []) {
+  if (!Array.isArray(metaData)) return [];
+
+  return metaData
+    .filter((item) => shouldIndexMetaKey(item?.key || item?.name || ""))
+    .map((item) => ({
+      key: item?.key || item?.name || "",
+      value: trimText(stripHtml(valueToText(item?.value)), MAX_META_FIELD_LENGTH)
+    }))
+    .filter((item) => item.key && item.value);
+}
+
+function filteredRawMeta(rawMeta = {}) {
+  if (!rawMeta || typeof rawMeta !== "object") return {};
+
+  return Object.fromEntries(
+    Object.entries(rawMeta)
+      .filter(([key]) => shouldIndexMetaKey(key))
+      .map(([key, value]) => [key, trimText(stripHtml(valueToText(value)), MAX_META_FIELD_LENGTH)])
+      .filter(([, value]) => value)
+  );
 }
 
 function productDetailsToText(product) {
@@ -181,7 +227,8 @@ function baseMetadata(product) {
     categories: product.categories || [],
     tags: product.tags || [],
     images: product.images || [],
-    meta_data: product.meta_data || [],
+    meta_data: filteredMetaData(product.meta_data),
+    raw_meta: filteredRawMeta(product.raw_meta),
     updated_at: product.updated_at || null
   };
 }
@@ -194,7 +241,8 @@ export function productToChunks(product) {
   const productDetails = productDetailsToText(product);
   const metaData = [metaDataToText(product.meta_data), rawMetaToText(product.raw_meta)]
     .filter(Boolean)
-    .join("\n");
+    .join("\n")
+    .slice(0, MAX_CUSTOM_META_LENGTH);
   const variations = product.variations?.length
     ? product.variations.map((variation) => JSON.stringify(variation)).join("\n")
     : "";
@@ -235,7 +283,7 @@ export function productToChunks(product) {
     product_id: product.product_id,
     chunk_index: index,
     title: name,
-    content: section.content,
+    content: trimText(section.content, MAX_CHUNK_CONTENT_LENGTH),
     url: product.url,
     sku: product.sku || null,
     price: product.price === "" || product.price == null ? null : Number(product.price),

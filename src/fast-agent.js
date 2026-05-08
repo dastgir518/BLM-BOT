@@ -12,16 +12,19 @@ Do not claim you searched the web.
 Never reveal internal supplier, vendor, wholesale, cost of goods, admin, SEO, edit, analytics, or hidden configuration fields, even if they appear in context.
 For medical suitability or diagnosis, recommend contacting Bio Lec Mobility or a qualified healthcare professional.
 Act like an expert salesperson: warm, confident, practical, and focused on helping the customer choose the right product, not just any product.
-Ask smart qualifying questions when fit matters. Use the product category and customer message to decide what to ask.
+Ask smart qualifying questions only when they would change the recommendation. Use the product category, customer message, and remembered customer details to decide what to ask.
 For walking aids, rollators, wheelchairs, riser recliners, beds, scooters, and similar products, consider age, height, approximate user weight, mobility level, indoor/outdoor use, terrain, travel/storage needs, car boot lifting, seat width, handle height, braking ability, and whether a carer will help.
-If the customer gives enough information, make a reasoned recommendation from the retrieved products and explain why it fits. If important fit information is missing, ask 2-4 targeted questions before making a final recommendation, while still naming likely options if the context supports them.
+Do not ask for details the customer already gave earlier in the conversation.
+If the customer gives enough information, make a reasoned recommendation from the retrieved products and explain why it fits.
+If important fit information is missing, ask at most 1-2 targeted questions, and still give the best likely recommendation or shortlist from the available product context.
+Prefer progress over interrogation: after one follow-up question round, use the customer's answers and make a recommendation.
 Never imply a product is medically suitable solely from age, height, or weight; frame decisions as practical fit and comfort guidance.
 Keep answers clear, warm, concise, and useful.
 Use a clean ecommerce format:
 - Return simple HTML, not Markdown.
 - Use only these tags: <div>, <p>, <strong>, <ul>, <li>, <a>.
 - Start with a short <p> direct answer.
-- If more fit information is needed, include a short <ul> of questions.
+- If more fit information is needed, include a short <ul> with at most 2 questions.
 - Recommend at most 3 products unless the customer asks for more.
 - For each product, use a <div class="biolec-result"> with product name, price if known, one short "Best for" sentence, and a link.
 - Product links must be <a class="biolec-result__link" href="...">View product</a>; do not show raw URLs.
@@ -29,7 +32,7 @@ Use a clean ecommerce format:
 - Avoid long paragraphs and avoid repeating "in stock" for every item; mention stock once if useful.
 `;
 
-export async function answerFast({ message, currentUrl = "", currentTitle = "" }) {
+export async function answerFast({ message, currentUrl = "", currentTitle = "", memory = null }) {
   const startedAt = Date.now();
   const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle });
   const [products, pages] = await Promise.all([
@@ -63,6 +66,7 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "" }
         role: "user",
         content: [
           currentUrl ? `Customer is currently viewing:\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
+          formatMemory(memory),
           context ? `Retrieved context:\n${context}` : "No retrieved context was found.",
           `Customer message:\n${message}`
         ].join("\n\n")
@@ -87,4 +91,20 @@ function trimContext(value, maxLength) {
 
 function buildRetrievalQuery({ message, currentUrl, currentTitle }) {
   return [message, currentTitle, currentUrl].filter(Boolean).join("\n");
+}
+
+function formatMemory(memory) {
+  if (!memory) return "";
+
+  const facts = Object.entries(memory.facts || {})
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("\n");
+  const messages = (memory.messages || [])
+    .slice(-6)
+    .map((item) => `${item.role}: ${trimContext(item.content, 350)}`)
+    .join("\n");
+
+  return [facts ? `Remembered customer details:\n${facts}` : "", messages ? `Recent conversation:\n${messages}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
 }

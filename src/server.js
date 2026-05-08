@@ -8,6 +8,7 @@ import { semanticProductSearch, semanticPageSearch } from "./search.js";
 import { answerWithCodex } from "./codex-agent.js";
 import { answerFast } from "./fast-agent.js";
 import { checkSupabase } from "./health.js";
+import { getSessionMemory, rememberAssistantMessage, rememberUserMessage } from "./session-memory.js";
 
 const app = express();
 
@@ -20,7 +21,7 @@ app.use(
 
 app.use(
   express.json({
-    limit: "2mb",
+    limit: "10mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf.toString("utf8");
     }
@@ -55,6 +56,7 @@ app.post("/wp-sync/product-upsert", verifyWordPressSignature, async (req, res, n
     const result = await upsertProduct(req.body);
     res.json({ ok: true, ...result });
   } catch (error) {
+    console.error(`product sync failed product_id=${req.body?.product_id || "unknown"}`);
     next(error);
   }
 });
@@ -129,9 +131,12 @@ app.post("/chat", async (req, res, next) => {
       return res.status(400).json({ error: "message is required" });
     }
 
+    rememberUserMessage(sessionId, message);
+    const memory = getSessionMemory(sessionId);
     const result = config.answerEngine === "fast"
-      ? await answerFast({ message, currentUrl, currentTitle })
-      : await answerWithCodex({ sessionId, message, currentUrl, currentTitle });
+      ? await answerFast({ message, currentUrl, currentTitle, memory })
+      : await answerWithCodex({ sessionId, message, currentUrl, currentTitle, memory });
+    rememberAssistantMessage(sessionId, result.answer);
     return res.json(result);
   } catch (error) {
     next(error);
@@ -140,8 +145,9 @@ app.post("/chat", async (req, res, next) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
-  res.status(500).json({
-    error: "Internal server error",
+  const status = error.status || error.statusCode || 500;
+  res.status(status).json({
+    error: status === 500 ? "Internal server error" : error.message,
     detail: process.env.NODE_ENV === "production" ? undefined : error.message
   });
 });
