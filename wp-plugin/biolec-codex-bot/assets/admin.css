@@ -1,0 +1,160 @@
+.biolec-bot-admin {
+  max-width: 1120px;
+}
+
+.biolec-bot-admin h1 {
+  margin-bottom: 18px;
+}
+
+.biolec-bot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.biolec-bot-panel {
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  padding: 18px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.biolec-bot-panel h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.biolec-bot-muted {
+  margin: 0 0 16px;
+  color: #646970;
+}
+
+.biolec-bot-field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.biolec-bot-field span {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.biolec-bot-field input[type="url"],
+.biolec-bot-field input[type="text"] {
+  width: 100%;
+  max-width: 560px;
+}
+
+.biolec-bot-field small {
+  display: block;
+  margin-top: 6px;
+  color: #646970;
+}
+
+.biolec-bot-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  font-weight: 600;
+}
+
+.biolec-bot-actions,
+.biolec-bot-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.biolec-bot-inline-form {
+  margin: 0;
+}
+
+.biolec-bot-inline-form .button {
+  min-height: 34px;
+}
+
+.biolec-bot-inline-form .biolec-danger {
+  border-color: #b32d2e;
+  color: #b32d2e;
+}
+
+.biolec-bot-inline-form .biolec-danger:hover,
+.biolec-bot-inline-form .biolec-danger:focus {
+  border-color: #8a2424;
+  color: #8a2424;
+}
+
+.biolec-danger {
+  border-color: #b32d2e !important;
+  color: #b32d2e !important;
+}
+
+.biolec-danger:hover,
+.biolec-danger:focus {
+  border-color: #8a2424 !important;
+  color: #8a2424 !important;
+}
+
+.biolec-progress {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  background: #f6f7f7;
+}
+
+.biolec-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.biolec-progress__count {
+  color: #646970;
+}
+
+.biolec-progress__bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dcdcde;
+}
+
+.biolec-progress__bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #2271b1;
+  transition: width 160ms ease;
+}
+
+.biolec-progress__status {
+  margin: 10px 0 0;
+  color: #3c434a;
+}
+
+.biolec-progress__errors {
+  max-height: 160px;
+  overflow: auto;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-left: 4px solid #b32d2e;
+  background: #fff;
+}
+
+.biolec-progress__errors p {
+  margin: 0 0 6px;
+}
+
+@media (max-width: 900px) {
+  .biolec-bot-grid {
+    grid-template-columns: 1fr;
+  }
+}

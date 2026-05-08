@@ -1,0 +1,589 @@
+.biolec-chat {
+  --blm-green: #1fa85a;
+  --blm-green-deep: #14703d;
+  --blm-green-soft: #e6f4ec;
+  --blm-bg: #fafaf7;
+  --blm-surface: #ffffff;
+  --blm-surface-2: #f4f2ec;
+  --blm-ink: #14201a;
+  --blm-ink-2: #4a5650;
+  --blm-ink-3: #7b847f;
+  --blm-line: #e4e1d7;
+  --blm-line-soft: #efede6;
+  --blm-shadow: 0 8px 24px rgba(20, 32, 26, 0.1), 0 32px 64px rgba(20, 112, 61, 0.18);
+  --blm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--blm-ink);
+  isolation: isolate;
+  contain: layout style;
+}
+
+:host {
+  all: initial;
+}
+
+.biolec-chat *,
+.biolec-chat *::before,
+.biolec-chat *::after {
+  box-sizing: border-box;
+}
+
+.biolec-chat [hidden] {
+  display: none !important;
+}
+
+.biolec-chat button,
+.biolec-chat textarea,
+.biolec-chat a {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.biolec-chat button,
+.biolec-chat textarea {
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
+}
+
+.biolec-chat button {
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  text-decoration: none;
+}
+
+.biolec-chat svg {
+  display: block;
+  max-width: none;
+  fill: none;
+}
+
+.biolec-chat p,
+.biolec-chat ul {
+  font: inherit;
+}
+
+.biolec-chat img,
+.biolec-chat svg {
+  vertical-align: initial;
+}
+
+.biolec-chat__teaser {
+  position: relative;
+  max-width: 280px;
+  padding: 14px 38px 14px 16px;
+  border: 1px solid var(--blm-line);
+  border-radius: 20px;
+  background: var(--blm-surface);
+  box-shadow: 0 2px 6px rgba(20, 32, 26, 0.06), 0 16px 36px rgba(20, 112, 61, 0.1);
+  animation: biolec-fade-up 400ms var(--blm-ease);
+}
+
+.biolec-chat__teaser span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--blm-green-deep);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.biolec-chat__teaser p {
+  margin: 0;
+  color: var(--blm-ink-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.biolec-chat__teaser-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--blm-ink-3);
+  cursor: pointer;
+}
+
+.biolec-chat__teaser-close:hover {
+  background: var(--blm-surface-2);
+}
+
+.biolec-chat__toggle {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blm-green), var(--blm-green-deep));
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(20, 112, 61, 0.28), 0 4px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 200ms var(--blm-ease), box-shadow 200ms var(--blm-ease);
+}
+
+.biolec-chat__toggle:hover {
+  transform: scale(1.05);
+  box-shadow: 0 16px 40px rgba(20, 112, 61, 0.4);
+}
+
+.biolec-chat__launcher-icon {
+  width: 29px;
+  height: 29px;
+  display: block;
+}
+
+.biolec-chat__pulse {
+  position: absolute;
+  inset: -6px;
+  border: 2px solid var(--blm-green);
+  border-radius: 50%;
+  animation: biolec-pulse 2s var(--blm-ease) infinite;
+}
+
+.biolec-chat__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e64545;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.biolec-chat__panel {
+  width: min(440px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 48px));
+  border: 1px solid var(--blm-line);
+  border-radius: 28px;
+  background: var(--blm-surface);
+  box-shadow: var(--blm-shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: biolec-app-in 280ms var(--blm-ease);
+}
+
+.biolec-chat__header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--blm-line);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+.biolec-chat__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.biolec-chat__brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--blm-green);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.biolec-chat__brand strong {
+  display: block;
+  color: var(--blm-ink);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.biolec-chat__brand span:not(.biolec-chat__brand-mark) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--blm-ink-3);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.biolec-chat__brand i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blm-green);
+  box-shadow: 0 0 0 4px rgba(31, 168, 90, 0.18);
+}
+
+.biolec-chat__close {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--blm-surface-2);
+  color: var(--blm-ink-2);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+.biolec-chat__close:hover {
+  background: var(--blm-ink);
+  color: #fff;
+}
+
+.biolec-chat__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.biolec-chat__messages {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 18px 12px;
+  overflow-y: auto;
+  background: var(--blm-surface);
+}
+
+.biolec-chat__messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.biolec-chat__messages::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: var(--blm-line);
+}
+
+.biolec-chat__message {
+  max-width: 84%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  animation: biolec-msg-in 280ms var(--blm-ease);
+}
+
+.biolec-chat__message--user {
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+  background: var(--blm-green);
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+
+.biolec-chat__message--bot {
+  align-self: flex-start;
+  max-width: 100%;
+  border-bottom-left-radius: 4px;
+  background: var(--blm-surface-2);
+  color: var(--blm-ink);
+}
+
+.biolec-chat__message--bot p {
+  margin: 0 0 8px;
+}
+
+.biolec-chat__message--bot p:last-child,
+.biolec-chat__message--bot ul:last-child,
+.biolec-chat__message--bot .biolec-result:last-child {
+  margin-bottom: 0;
+}
+
+.biolec-chat__message--bot ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+
+.biolec-result {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid var(--blm-line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.biolec-result strong {
+  display: block;
+  color: var(--blm-ink);
+  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.biolec-result p {
+  margin: 0;
+  color: var(--blm-ink-2);
+  line-height: 1.35;
+}
+
+.biolec-result__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 32px;
+  margin-top: 4px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--blm-green);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.biolec-result__link:hover,
+.biolec-result__link:focus {
+  background: var(--blm-green-deep);
+  color: #fff;
+  text-decoration: none;
+}
+
+.biolec-chat__quick {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.biolec-chat__prompts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 0 16px 12px;
+  flex-shrink: 0;
+}
+
+.biolec-chat__prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--blm-line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--blm-ink);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: transform 200ms var(--blm-ease), border-color 200ms var(--blm-ease), box-shadow 200ms var(--blm-ease);
+}
+
+.biolec-chat__prompt:hover {
+  transform: translateY(-2px);
+  border-color: var(--blm-green);
+  box-shadow: 0 4px 16px rgba(20, 112, 61, 0.1);
+}
+
+.biolec-chat__prompt-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--blm-green-soft);
+  color: var(--blm-green-deep);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.biolec-chat__prompt span:not(.biolec-chat__prompt-icon) {
+  flex: 1;
+  line-height: 1.35;
+}
+
+.biolec-chat__prompt i {
+  color: var(--blm-ink-3);
+  font-style: normal;
+  transition: transform 160ms var(--blm-ease), color 160ms var(--blm-ease);
+}
+
+.biolec-chat__prompt:hover i {
+  color: var(--blm-green-deep);
+  transform: translateX(2px);
+}
+
+.biolec-chat__quick button {
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--blm-surface-2);
+  color: var(--blm-ink-2);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.biolec-chat__quick button:hover {
+  border-color: var(--blm-green);
+  background: #fff;
+  color: var(--blm-green-deep);
+}
+
+.biolec-chat__form {
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--blm-line);
+  background: var(--blm-surface);
+}
+
+.biolec-chat__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--blm-line);
+  border-radius: 20px;
+  background: #fff;
+  transition: border 160ms var(--blm-ease), box-shadow 160ms var(--blm-ease);
+}
+
+.biolec-chat__composer:focus-within {
+  border-color: var(--blm-green);
+  box-shadow: 0 0 0 3px rgba(31, 168, 90, 0.12);
+}
+
+.biolec-chat__input {
+  flex: 1;
+  min-width: 0;
+  max-height: 120px;
+  padding: 6px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--blm-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.biolec-chat__input::placeholder {
+  color: var(--blm-ink-3);
+}
+
+.biolec-chat__send {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--blm-green);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 160ms var(--blm-ease);
+}
+
+.biolec-chat__send:hover {
+  background: var(--blm-green-deep);
+}
+
+.biolec-chat__send svg {
+  width: 19px;
+  height: 19px;
+}
+
+.biolec-chat__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 4px 0;
+  color: var(--blm-ink-3);
+  font-size: 11px;
+}
+
+@keyframes biolec-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes biolec-app-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes biolec-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes biolec-pulse {
+  0% { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+
+@media (max-width: 640px) {
+  .biolec-chat {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .biolec-chat__panel {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .biolec-chat__teaser {
+    display: none;
+  }
+}

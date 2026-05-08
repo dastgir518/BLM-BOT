@@ -124,14 +124,14 @@ app.post("/search/pages", async (req, res, next) => {
 
 app.post("/chat", async (req, res, next) => {
   try {
-    const { session_id: sessionId, message } = req.body;
+    const { session_id: sessionId, message, current_url: currentUrl, current_title: currentTitle } = req.body;
     if (!message) {
       return res.status(400).json({ error: "message is required" });
     }
 
     const result = config.answerEngine === "fast"
-      ? await answerFast({ message })
-      : await answerWithCodex({ sessionId, message });
+      ? await answerFast({ message, currentUrl, currentTitle })
+      : await answerWithCodex({ sessionId, message, currentUrl, currentTitle });
     return res.json(result);
   } catch (error) {
     next(error);

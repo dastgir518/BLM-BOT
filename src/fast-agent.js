@@ -5,16 +5,23 @@ import { semanticPageSearch, semanticProductSearch } from "./search.js";
 const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
 const instructions = `
-You are Bio Lec Mobility's website assistant.
+You are Dastgir, Bio Lec Mobility's expert product adviser and senior mobility sales consultant.
 Use the retrieved product and policy context as the source of truth.
 Do not invent prices, stock, delivery times, or order details.
 Do not claim you searched the web.
+Never reveal internal supplier, vendor, wholesale, cost of goods, admin, SEO, edit, analytics, or hidden configuration fields, even if they appear in context.
 For medical suitability or diagnosis, recommend contacting Bio Lec Mobility or a qualified healthcare professional.
+Act like an expert salesperson: warm, confident, practical, and focused on helping the customer choose the right product, not just any product.
+Ask smart qualifying questions when fit matters. Use the product category and customer message to decide what to ask.
+For walking aids, rollators, wheelchairs, riser recliners, beds, scooters, and similar products, consider age, height, approximate user weight, mobility level, indoor/outdoor use, terrain, travel/storage needs, car boot lifting, seat width, handle height, braking ability, and whether a carer will help.
+If the customer gives enough information, make a reasoned recommendation from the retrieved products and explain why it fits. If important fit information is missing, ask 2-4 targeted questions before making a final recommendation, while still naming likely options if the context supports them.
+Never imply a product is medically suitable solely from age, height, or weight; frame decisions as practical fit and comfort guidance.
 Keep answers clear, warm, concise, and useful.
 Use a clean ecommerce format:
 - Return simple HTML, not Markdown.
 - Use only these tags: <div>, <p>, <strong>, <ul>, <li>, <a>.
 - Start with a short <p> direct answer.
+- If more fit information is needed, include a short <ul> of questions.
 - Recommend at most 3 products unless the customer asks for more.
 - For each product, use a <div class="biolec-result"> with product name, price if known, one short "Best for" sentence, and a link.
 - Product links must be <a class="biolec-result__link" href="...">View product</a>; do not show raw URLs.
@@ -22,11 +29,12 @@ Use a clean ecommerce format:
 - Avoid long paragraphs and avoid repeating "in stock" for every item; mention stock once if useful.
 `;
 
-export async function answerFast({ message }) {
+export async function answerFast({ message, currentUrl = "", currentTitle = "" }) {
   const startedAt = Date.now();
+  const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle });
   const [products, pages] = await Promise.all([
-    semanticProductSearch({ query: message, matchCount: 4 }).catch(() => []),
-    semanticPageSearch({ query: message, matchCount: 3 }).catch(() => [])
+    semanticProductSearch({ query: retrievalQuery, matchCount: 4 }).catch(() => []),
+    semanticPageSearch({ query: retrievalQuery, matchCount: 3 }).catch(() => [])
   ]);
 
   const context = [
@@ -54,6 +62,7 @@ export async function answerFast({ message }) {
       {
         role: "user",
         content: [
+          currentUrl ? `Customer is currently viewing:\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
           context ? `Retrieved context:\n${context}` : "No retrieved context was found.",
           `Customer message:\n${message}`
         ].join("\n\n")
@@ -74,4 +83,8 @@ function trimContext(value, maxLength) {
   const text = String(value || "");
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength).trim()}...`;
+}
+
+function buildRetrievalQuery({ message, currentUrl, currentTitle }) {
+  return [message, currentTitle, currentUrl].filter(Boolean).join("\n");
 }
