@@ -135,13 +135,27 @@ app.post("/chat", async (req, res, next) => {
     const memory = getSessionMemory(sessionId);
     const result = config.answerEngine === "fast"
       ? await answerFast({ message, currentUrl, currentTitle, memory })
-      : await answerWithCodex({ sessionId, message, currentUrl, currentTitle, memory });
+      : await answerWithCodexFallback({ sessionId, message, currentUrl, currentTitle, memory });
     rememberAssistantMessage(sessionId, result.answer);
     return res.json(result);
   } catch (error) {
     next(error);
   }
 });
+
+async function answerWithCodexFallback({ sessionId, message, currentUrl, currentTitle, memory }) {
+  try {
+    return await answerWithCodex({ sessionId, message, currentUrl, currentTitle, memory });
+  } catch (error) {
+    console.error("codex answer failed; falling back to fast answer");
+    console.error(error);
+    const result = await answerFast({ message, currentUrl, currentTitle, memory });
+    return {
+      ...result,
+      answer_engine_fallback: "fast"
+    };
+  }
+}
 
 app.use((error, _req, res, _next) => {
   console.error(error);
