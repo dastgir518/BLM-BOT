@@ -6,12 +6,14 @@ export function getSessionMemory(sessionId) {
   const session = getSession(sessionId);
   return {
     facts: { ...session.facts },
-    messages: [...session.messages]
+    messages: [...session.messages],
+    customerTurns: session.customerTurns || 0
   };
 }
 
 export function rememberUserMessage(sessionId, message) {
   const session = getSession(sessionId);
+  session.customerTurns = (session.customerTurns || 0) + 1;
   session.messages.push({ role: "customer", content: String(message || "") });
   session.messages = session.messages.slice(-MAX_MESSAGES);
   mergeFacts(session.facts, extractFacts(message));
@@ -26,7 +28,7 @@ export function rememberAssistantMessage(sessionId, answer) {
 function getSession(sessionId) {
   const key = sessionId || "anonymous";
   if (!sessions.has(key)) {
-    sessions.set(key, { facts: {}, messages: [] });
+    sessions.set(key, { facts: {}, messages: [], customerTurns: 0 });
   }
   return sessions.get(key);
 }
