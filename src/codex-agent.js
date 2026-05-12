@@ -16,17 +16,21 @@ If no relevant retrieved context is included, say that the product/policy index 
 Never reveal internal supplier, vendor, wholesale, cost of goods, admin, SEO, edit, analytics, or hidden configuration fields, even if they appear in context.
 For medical suitability, diagnosis, or clinical advice, recommend contacting Bio Lec Mobility or a qualified healthcare professional.
 For refunds, damaged goods, complaints, legal questions, urgent delivery, or uncertain order issues, escalate to human support.
+For order questions, use provided WooCommerce order context as the source of truth. If order context says billing email is needed, ask for the billing email address. If no order is found for that email, ask for the order number. Do not reveal order details when an email mismatch is reported.
+When an order is processing and order notes are provided, use the latest WooCommerce notes to explain delivery or tracking information. Keep order answers concise and include the status, delivery/tracking detail if available, and one helpful next step.
 When recommending products, explain the practical reason and include product links when available.
 Act like an expert salesperson: warm, confident, practical, and focused on helping the customer choose the right product, not just any product.
 Use a staged sales flow. Ask smart qualifying questions only when they would change the recommendation. Use the product category, customer message, remembered customer details, and customer turn count to decide what to ask.
-For a new product-choice conversation, the first assistant reply should ask only the most important qualifying questions while also steering the customer toward the likely product type or next buying step.
+For a new product-choice conversation, the first assistant reply should ask for the baseline customer profile before recommending: age, height, approximate weight, and any disability, illness, condition, pain, balance issue, or mobility limitation that affects product use.
+Use those baseline details to judge whether the customer can practically use the product: handle height, maximum user weight, seat/rest needs, braking/grip ability, balance, transfer ability, indoor/outdoor suitability, and whether carer support is needed.
+If the customer already gave some baseline details, ask only for the missing ones.
 After the customer answers those first questions, recommend or shortlist products immediately using the available product context. Keep the conversation open and invite the user to refine, compare, or confirm.
 By the third customer message in a product-choice conversation, choose the best product you can from the available context, explain the fit, and guide the customer toward a decision such as viewing the product, comparing one alternative, or contacting Bio Lec.
 Ask questions in small batches across the conversation, never all at once.
-For rollators and walking aids, ask first for height and approximate user weight if missing. On the next turn, ask about indoor/outdoor use, terrain, folding/car boot needs, and whether they need a seat/rest breaks if missing.
-For wheelchairs, ask first for user weight and seat width/body size if missing. On the next turn, ask about self-propelled vs attendant-propelled, travel/folding needs, and indoor/outdoor use if missing.
-For mobility scooters, ask first for user weight and main use area if missing. On the next turn, ask about range, pavement/road use, car boot portability, and storage/charging if missing.
-For riser recliners and beds, ask first for height, approximate weight, and main comfort/positioning need if missing. On the next turn, ask about room size, transfer difficulty, and carer support if missing.
+For rollators and walking aids, later ask about indoor/outdoor use, terrain, folding/car boot needs, hand grip/brake comfort, and whether they need a seat/rest breaks if missing.
+For wheelchairs, later ask about seat width/body size, self-propelled vs attendant-propelled, travel/folding needs, and indoor/outdoor use if missing.
+For mobility scooters, later ask about range, pavement/road use, car boot portability, and storage/charging if missing.
+For riser recliners and beds, later ask about room size, transfer difficulty, comfort/positioning need, and carer support if missing.
 Do not ask for details the customer already gave earlier in the conversation.
 If the customer gives enough information, make a reasoned recommendation from the retrieved products and explain why it fits.
 If important fit information is missing on the first reply, ask at most 2 targeted questions and include a short steering statement about what you are trying to match.
@@ -39,7 +43,8 @@ Use a clean ecommerce format:
 - Use only these tags: <div>, <p>, <strong>, <ul>, <li>, <a>.
 - Start with a short <p> direct answer.
 - If more fit information is needed, include a short <ul> with at most 2 questions.
-- Recommend at most 3 products unless the customer asks for more.
+- When recommending from a broad category or multiple matching products, show 3-5 suitable products depending on the customer's criteria.
+- When the customer asks about a specific named product, focus on that product first and optionally compare 1-2 close alternatives.
 - For each product, use a <div class="biolec-result"> with product name, price if known, one short "Best for" sentence, and a link.
 - Product links must be <a class="biolec-result__link" href="...">View product</a>; do not show raw URLs.
 - Do not say "product index", "retrieved context", "similarity", or other internal system words.
@@ -108,11 +113,11 @@ function getThread(sessionId) {
   return sessions.get(key);
 }
 
-export async function answerWithCodex({ sessionId, message, currentUrl = "", currentTitle = "", memory = null }) {
+export async function answerWithCodex({ sessionId, message, currentUrl = "", currentTitle = "", memory = null, orderContext = "" }) {
   const startedAt = Date.now();
   const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle });
   const [products, pages] = await Promise.all([
-    timed("productSearch", () => semanticProductSearch({ query: retrievalQuery, matchCount: 4 }).catch(() => [])),
+    timed("productSearch", () => semanticProductSearch({ query: retrievalQuery, matchCount: 12 }).catch(() => [])),
     timed("pageSearch", () => semanticPageSearch({ query: retrievalQuery, matchCount: 3 }).catch(() => []))
   ]);
 
@@ -124,7 +129,8 @@ export async function answerWithCodex({ sessionId, message, currentUrl = "", cur
         `Stock: ${product.metadata?.stock_status || product.stock_status || "unknown"}`,
         `Price: ${product.metadata?.price || "unknown"}`,
         `Similarity: ${product.similarity}`,
-        trimContext(product.content, 900)
+        formatProductMetadata(product),
+        trimContext(product.content, 700)
       ].join("\n");
     })
     .join("\n\n---\n\n");
@@ -144,6 +150,7 @@ export async function answerWithCodex({ sessionId, message, currentUrl = "", cur
     instructions,
     currentUrl ? `Customer is currently viewing:\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
     formatMemory(memory),
+    orderContext ? `WooCommerce order context:\n${orderContext}` : "",
     productContext ? `Relevant product knowledge:\n${productContext}` : "No product context was retrieved.",
     pageContext ? `Relevant policy/page knowledge:\n${pageContext}` : "No policy/page context was retrieved.",
     `Customer message:\n${message}`
@@ -191,6 +198,25 @@ function trimContext(value, maxLength) {
 
 function buildRetrievalQuery({ message, currentUrl, currentTitle }) {
   return [message, currentTitle, currentUrl].filter(Boolean).join("\n");
+}
+
+function formatProductMetadata(product) {
+  const rawMeta = product.metadata?.raw_meta || {};
+  const metaData = Array.isArray(product.metadata?.meta_data) ? product.metadata.meta_data : [];
+  const lines = [];
+
+  for (const key of ["table-box", "product_faq_html", "custom_category_field"]) {
+    if (rawMeta[key]) {
+      lines.push(`${key}: ${trimContext(rawMeta[key], 1200)}`);
+    }
+  }
+
+  const usefulMeta = metaData
+    .filter((item) => ["table-box", "product_faq_html", "custom_category_field"].includes(item.key))
+    .map((item) => `${item.key}: ${trimContext(item.value, 1200)}`);
+
+  lines.push(...usefulMeta);
+  return lines.length ? `Useful product details:\n${lines.join("\n")}` : "";
 }
 
 function formatMemory(memory) {

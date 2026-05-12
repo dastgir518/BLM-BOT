@@ -8,6 +8,7 @@ import { semanticProductSearch, semanticPageSearch } from "./search.js";
 import { answerWithCodex } from "./codex-agent.js";
 import { answerFast } from "./fast-agent.js";
 import { checkSupabase } from "./health.js";
+import { buildOrderContext } from "./order-lookup.js";
 import { getSessionMemory, rememberAssistantMessage, rememberUserMessage } from "./session-memory.js";
 
 const app = express();
@@ -133,9 +134,14 @@ app.post("/chat", async (req, res, next) => {
 
     rememberUserMessage(sessionId, message);
     const memory = getSessionMemory(sessionId);
+    const orderContext = await buildOrderContext({ message, memory }).catch((error) => {
+      console.error("order lookup failed");
+      console.error(error);
+      return "Order lookup status: lookup_error\nSay you could not check the order just now and offer to connect the customer with Bio Lec Mobility.";
+    });
     const result = config.answerEngine === "fast"
-      ? await answerFast({ message, currentUrl, currentTitle, memory })
-      : await answerWithCodexFallback({ sessionId, message, currentUrl, currentTitle, memory });
+      ? await answerFast({ message, currentUrl, currentTitle, memory, orderContext })
+      : await answerWithCodexFallback({ sessionId, message, currentUrl, currentTitle, memory, orderContext });
     rememberAssistantMessage(sessionId, result.answer);
     return res.json(result);
   } catch (error) {
@@ -143,13 +149,13 @@ app.post("/chat", async (req, res, next) => {
   }
 });
 
-async function answerWithCodexFallback({ sessionId, message, currentUrl, currentTitle, memory }) {
+async function answerWithCodexFallback({ sessionId, message, currentUrl, currentTitle, memory, orderContext }) {
   try {
-    return await answerWithCodex({ sessionId, message, currentUrl, currentTitle, memory });
+    return await answerWithCodex({ sessionId, message, currentUrl, currentTitle, memory, orderContext });
   } catch (error) {
     console.error("codex answer failed; falling back to fast answer");
     console.error(error);
-    const result = await answerFast({ message, currentUrl, currentTitle, memory });
+    const result = await answerFast({ message, currentUrl, currentTitle, memory, orderContext });
     return {
       ...result,
       answer_engine_fallback: "fast"

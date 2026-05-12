@@ -47,6 +47,12 @@ function extractFacts(message = "") {
   const text = String(message);
   const facts = {};
   const lower = text.toLowerCase();
+  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  if (email) facts.email = email[0].toLowerCase();
+
+  const orderId = text.match(/\b(?:order\s*(?:id|number|no|#)?\s*)#?\s*(\d{3,})\b/i)
+    || text.match(/#\s*(\d{3,})\b/);
+  if (orderId) facts.order_id = orderId[1];
 
   const age = lower.match(/\b(?:age|aged|he is|she is|i am|i'm|im)\s*(\d{2,3})\b/) || lower.match(/\b(\d{2,3})\s*(?:years? old|yr old|yrs old)\b/);
   if (age) facts.age = age[1];
@@ -64,6 +70,32 @@ function extractFacts(message = "") {
   if (/\b(car boot|boot|travel|fold|folding|portable|transport)\b/.test(lower)) facts.transport = "needs folding/portable option";
   if (/\b(seat|sit|rest|breaks?)\b/.test(lower)) facts.resting = "needs a seat/rest option";
   if (/\b(arthritis|weak grip|brake|brakes|hands?)\b/.test(lower)) facts.hand_control = "check grip and brake comfort";
+
+  const condition = lower.match(/\b(?:condition|disability|illness|diagnosed with|has|have|suffers? from)\s+([^.;,\n]{3,80})/);
+  if (condition) facts.condition = condition[1].trim();
+
+  const commonConditions = [
+    "arthritis",
+    "parkinson",
+    "stroke",
+    "ms",
+    "multiple sclerosis",
+    "copd",
+    "dementia",
+    "alzheimer",
+    "hip replacement",
+    "knee replacement",
+    "back pain",
+    "sciatica",
+    "balance",
+    "weakness",
+    "breathless",
+    "neuropathy"
+  ];
+  const matchedConditions = commonConditions.filter((item) => lower.includes(item));
+  if (matchedConditions.length && !facts.condition) {
+    facts.condition = matchedConditions.join(", ");
+  }
 
   return facts;
 }
