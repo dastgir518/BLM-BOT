@@ -7,6 +7,12 @@ export async function upsertProduct(product) {
     throw new Error("Invalid product payload");
   }
 
+  // Defensive: only published products belong in the vector store. If anything
+  // else arrives, remove it rather than index it.
+  if (product.status && product.status !== "publish") {
+    return deleteProduct(product.product_id);
+  }
+
   const chunks = productToChunks(product);
   const embeddings = await createEmbeddings(chunks.map((chunk) => chunk.content));
 

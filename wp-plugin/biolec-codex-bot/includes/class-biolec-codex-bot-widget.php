@@ -78,8 +78,18 @@ class Biolec_Codex_Bot_Widget
                             <span><i></i>Bio-Lec assistant</span>
                         </div>
                     </div>
-                    <button class="biolec-chat__a11y-toggle" type="button" aria-label="Accessibility options" aria-expanded="false">Aa</button>
-                    <button class="biolec-chat__new" type="button" aria-label="Start new chat">New chat</button>
+                    <button class="biolec-chat__a11y-toggle" type="button" aria-label="Accessibility: read aloud and text size" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M4 9v6h4l5 4V5L8 9H4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+                            <path d="M16.5 8.5a4.5 4.5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                        </svg>
+                        <span>Accessibility</span>
+                    </button>
+                    <button class="biolec-chat__new" type="button" aria-label="Start new chat" title="New chat">
+                        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                            <path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                        </svg>
+                    </button>
                     <button class="biolec-chat__close" type="button" aria-label="Close chat">
                         <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                             <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
@@ -107,6 +117,7 @@ class Biolec_Codex_Bot_Widget
                 <input class="biolec-chat__hp" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
                 <form class="biolec-chat__start">
                     <strong>Start chat</strong>
+                    <p class="biolec-chat__start-intro">Please enter your name and email to continue chatting with Mobi.</p>
                     <label>
                         <span>Name</span>
                         <input class="biolec-chat__start-name" type="text" autocomplete="name" required>

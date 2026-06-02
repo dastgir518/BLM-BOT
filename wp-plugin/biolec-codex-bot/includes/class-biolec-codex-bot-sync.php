@@ -31,6 +31,16 @@ class Biolec_Codex_Bot_Sync
             return false;
         }
 
+        // Only published products belong in the vector store. If a product is a
+        // draft, private, pending, or otherwise not published, remove it (so a
+        // previously-published product that gets unpublished is taken out).
+        if ($product->get_status() !== 'publish') {
+            return self::send('/wp-sync/product-delete', [
+                'event' => 'product.unpublished',
+                'product_id' => (int) $product_id
+            ]);
+        }
+
         $payload = self::build_product_payload($product);
         return self::send('/wp-sync/product-upsert', $payload);
     }

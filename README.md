@@ -125,20 +125,14 @@ The bot server rejects missing, expired, or invalid signatures.
 GET  /health
 POST /wp-sync/product-upsert
 POST /wp-sync/product-delete
-POST /search/products
 POST /chat
 POST /chat/register
+POST /handoff
 ```
 
-Example product search:
-
-```json
-{
-  "query": "lightweight folding electric wheelchair for car boot",
-  "matchCount": 6,
-  "stockStatus": "instock"
-}
-```
+All `/chat*` and `/handoff` requests must come through the signed WordPress
+proxy (see Section 6). Product/page semantic search runs internally as part of
+`/chat`; there is no public search endpoint.
 
 Example chat request:
 

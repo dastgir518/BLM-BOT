@@ -211,6 +211,7 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .biolec-chat__brand-mark {
@@ -252,41 +253,40 @@
 }
 
 .biolec-chat__close {
-  margin-left: auto;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border: 0;
   border-radius: 50%;
   background: var(--blm-surface-2);
   color: var(--blm-ink-2);
   cursor: pointer;
-  font-size: 22px;
   line-height: 1;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .biolec-chat__new {
-  margin-left: auto;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--blm-line);
-  border-radius: 999px;
-  background: #fff;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--blm-surface-2);
   color: var(--blm-ink-2);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.biolec-chat__new svg {
+  width: 18px;
+  height: 18px;
 }
 
 .biolec-chat__new:hover {
-  border-color: var(--blm-green);
-  color: var(--blm-green-deep);
-}
-
-.biolec-chat__new + .biolec-chat__close {
-  margin-left: 0;
+  background: var(--blm-green);
+  color: #fff;
 }
 
 .biolec-chat__close:hover {
@@ -379,6 +379,13 @@
 .biolec-chat__start button:disabled {
   opacity: 0.6;
   cursor: progress;
+}
+
+.biolec-chat__start-intro {
+  margin: 0;
+  color: var(--blm-ink-2);
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .biolec-chat__start-error {
@@ -512,13 +519,33 @@
 /* --- Accessibility --------------------------------------------------------- */
 
 .biolec-chat__a11y-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--blm-line);
   border-radius: 999px;
   background: #fff;
   color: var(--blm-ink);
-  padding: 4px 10px;
-  font-weight: 700;
+  padding: 4px 10px 4px 8px;
+  font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.biolec-chat__a11y-toggle svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.biolec-chat__a11y-toggle span {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.biolec-chat__a11y-toggle:hover {
+  border-color: var(--blm-green);
+  color: var(--blm-green-deep);
 }
 
 .biolec-chat__a11y {

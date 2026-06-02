@@ -4,7 +4,6 @@ import { config } from "./config.js";
 import { verifyWordPressSignature } from "./security.js";
 import { upsertProduct, deleteProduct, clearProducts } from "./product-sync.js";
 import { upsertPage, deletePage, clearPages } from "./page-sync.js";
-import { semanticProductSearch, semanticPageSearch } from "./search.js";
 import { answerWithCodex } from "./codex-agent.js";
 import { answerFast } from "./fast-agent.js";
 import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff } from "./chat-store.js";
@@ -107,24 +106,6 @@ app.post("/wp-sync/pages-clear", verifyWordPressSignature, async (_req, res, nex
   try {
     const result = await clearPages();
     res.json({ ok: true, ...result });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/search/products", async (req, res, next) => {
-  try {
-    const results = await semanticProductSearch(req.body);
-    res.json({ results });
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/search/pages", async (req, res, next) => {
-  try {
-    const results = await semanticPageSearch(req.body);
-    res.json({ results });
   } catch (error) {
     next(error);
   }

@@ -129,6 +129,19 @@ function escapeIlike(value) {
   return String(value).replace(/[%_]/g, "\\$&");
 }
 
+const MIN_PRODUCT_SIMILARITY = 0.18;
+
+// Drop weak semantic matches so the model isn't tempted to recommend products
+// that barely relate to the query. Name (lexical) matches are always kept, and
+// if the threshold would remove everything we keep the top few.
+export function filterRelevantProducts(products = []) {
+  if (!Array.isArray(products) || !products.length) return [];
+  const kept = products.filter(
+    (item) => item.match_source === "name" || Number(item.similarity || 0) >= MIN_PRODUCT_SIMILARITY
+  );
+  return kept.length ? kept : products.slice(0, 3);
+}
+
 // Directly fetch the product a customer is viewing (by page URL) so its full
 // specifications are guaranteed in context, regardless of semantic ranking.
 export async function getProductByUrl(url) {

@@ -180,7 +180,7 @@ class Biolec_Codex_Bot_Rest
     {
         $ids = wc_get_products([
             'limit' => -1,
-            'status' => ['publish', 'draft', 'private'],
+            'status' => ['publish'],
             'return' => 'ids'
         ]);
 

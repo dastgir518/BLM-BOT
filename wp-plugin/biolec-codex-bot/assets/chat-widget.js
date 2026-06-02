@@ -573,7 +573,7 @@
     });
 
     function applyAccessibilitySettings() {
-      var size = window.localStorage.getItem(A11Y_TEXTSIZE_KEY) || 'normal';
+      var size = window.localStorage.getItem(A11Y_TEXTSIZE_KEY) || 'larger';
       scope.classList.remove('biolec-a11y-text-large', 'biolec-a11y-text-larger');
       if (size === 'large') scope.classList.add('biolec-a11y-text-large');
       if (size === 'larger') scope.classList.add('biolec-a11y-text-larger');

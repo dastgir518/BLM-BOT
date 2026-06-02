@@ -272,7 +272,7 @@ class Biolec_Codex_Bot_Admin
 
         $products = wc_get_products([
             'limit' => 1,
-            'status' => ['publish', 'draft', 'private']
+            'status' => ['publish']
         ]);
 
         if (empty($products)) {
@@ -297,7 +297,7 @@ class Biolec_Codex_Bot_Admin
 
         $products = wc_get_products([
             'limit' => -1,
-            'status' => ['publish', 'draft', 'private'],
+            'status' => ['publish'],
             'return' => 'ids'
         ]);
 
@@ -362,7 +362,7 @@ class Biolec_Codex_Bot_Admin
         $cleared_products = Biolec_Codex_Bot_Sync::clear_products(true);
         $products = wc_get_products([
             'limit' => -1,
-            'status' => ['publish', 'draft', 'private'],
+            'status' => ['publish'],
             'return' => 'ids'
         ]);
 

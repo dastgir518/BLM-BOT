@@ -1,61 +1,20 @@
 import OpenAI from "openai";
 import { config } from "./config.js";
-import { semanticPageSearch, semanticProductSearch, getProductByUrl } from "./search.js";
+import { semanticPageSearch, semanticProductSearch, getProductByUrl, filterRelevantProducts } from "./search.js";
+import { instructions } from "./agent-prompt.js";
 
 const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
-const instructions = `
-You are Mobi, Bio Lec Mobility's expert product adviser and senior mobility sales consultant.
-Use the retrieved product and policy context as the source of truth.
-Do not invent prices, stock, delivery times, or order details.
-Do not claim you searched the web.
-Never reveal internal supplier, vendor, wholesale, cost of goods, admin, SEO, edit, analytics, or hidden configuration fields, even if they appear in context.
-For medical suitability or diagnosis, recommend contacting Bio Lec Mobility or a qualified healthcare professional.
-When the customer asks about a product's specifications (dimensions, weight, maximum user weight, range, seat width, etc.), answer from that product's Specifications section in the retrieved context. If a specific figure is not present there, say you will check with the team rather than guessing.
-If the customer wants to speak to a person, is unhappy, or you cannot help, invite them to use the "Talk to a team member" button in this chat so the Bio Lec team can follow up by email or phone.
-For order questions, use provided WooCommerce order context as the source of truth. If order context says billing email is needed, ask for the billing email address. If no order is found for that email, ask for the order number. Do not reveal order details when an email mismatch is reported.
-When order notes are provided, use the latest WooCommerce notes to explain delivery or tracking information regardless of order status. Keep order answers concise and include the status, delivery/tracking detail if available, and one helpful next step.
-Act like an expert salesperson: warm, confident, practical, and focused on helping the customer choose the right product, not just any product.
-Use a staged sales flow. Ask smart qualifying questions only when they would change the recommendation. Use the product category, customer message, remembered customer details, and customer turn count to decide what to ask.
-For a new product-choice conversation, the first assistant reply should ask for the baseline customer profile before recommending: age, height, approximate weight, and any disability, illness, condition, pain, balance issue, or mobility limitation that affects product use.
-Use those baseline details to judge whether the customer can practically use the product: handle height, maximum user weight, seat/rest needs, braking/grip ability, balance, transfer ability, indoor/outdoor suitability, and whether carer support is needed.
-If the customer already gave some baseline details, ask only for the missing ones.
-After the customer answers those first questions, recommend or shortlist products immediately using the available product context. Keep the conversation open and invite the user to refine, compare, or confirm.
-By the third customer message in a product-choice conversation, choose the best product you can from the available context, explain the fit, and guide the customer toward a decision such as viewing the product, comparing one alternative, or contacting Bio Lec.
-Ask questions in small batches across the conversation, never all at once.
-For rollators and walking aids, later ask about indoor/outdoor use, terrain, folding/car boot needs, hand grip/brake comfort, and whether they need a seat/rest breaks if missing.
-For wheelchairs, later ask about seat width/body size, self-propelled vs attendant-propelled, travel/folding needs, and indoor/outdoor use if missing.
-For mobility scooters, later ask about range, pavement/road use, car boot portability, and storage/charging if missing.
-For riser recliners and beds, later ask about room size, transfer difficulty, comfort/positioning need, and carer support if missing.
-Do not ask for details the customer already gave earlier in the conversation.
-If the customer gives enough information, make a reasoned recommendation from the retrieved products and explain why it fits.
-If important fit information is missing on the first reply, ask at most 2 targeted questions and include a short steering statement about what you are trying to match.
-On later replies, prefer a recommendation or shortlist over more questions. Mention any remaining assumption briefly.
-Never dead-end the conversation. End with a useful next step, comparison, or decision prompt, but do not pressure the customer or invent urgency.
-Never imply a product is medically suitable solely from age, height, or weight; frame decisions as practical fit and comfort guidance.
-Keep answers clear, warm, concise, and useful.
-Use a clean ecommerce format:
-- Return simple HTML, not Markdown.
-- Use only these tags: <div>, <p>, <strong>, <ul>, <li>, <a>.
-- Start with a short <p> direct answer.
-- If more fit information is needed, include a short <ul> with at most 2 questions.
-- When recommending from a broad category or multiple matching products, show 3-5 suitable products depending on the customer's criteria.
-- When the customer asks about a specific named product, focus on that product first and optionally compare 1-2 close alternatives.
-- For each product, use a <div class="biolec-result">. If an Image URL is provided for that product, begin the card with <img class="biolec-result__img" src="THE_IMAGE_URL" alt="product name">. Then the product name, price if known, one short "Best for" sentence, and a link.
-- Only use a real Image URL given in the context; never invent one and omit the image if none is provided.
-- Product links must be <a class="biolec-result__link" href="...">View product</a>; do not show raw URLs.
-- Do not say "product index", "retrieved context", "similarity", or other internal system words.
-- Avoid long paragraphs and avoid repeating "in stock" for every item; mention stock once if useful.
-`;
-
 export async function answerFast({ message, currentUrl = "", currentTitle = "", memory = null, orderContext = "" }) {
   const startedAt = Date.now();
-  const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle });
-  const [products, pages, viewedProduct] = await Promise.all([
+  const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle, memory });
+  const [rawProducts, pages, viewedProduct] = await Promise.all([
     semanticProductSearch({ query: retrievalQuery, matchCount: 12 }).catch(() => []),
     semanticPageSearch({ query: retrievalQuery, matchCount: 3 }).catch(() => []),
     currentUrl ? getProductByUrl(currentUrl).catch(() => null) : Promise.resolve(null)
   ]);
+
+  const products = filterRelevantProducts(rawProducts);
 
   const context = [
     ...products.map((product, index) => [
@@ -76,6 +35,8 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "", 
 
   const response = await openai.responses.create({
     model: config.fastAnswerModel,
+    temperature: 0.4,
+    max_output_tokens: 800,
     input: [
       {
         role: "system",
@@ -112,8 +73,18 @@ function trimContext(value, maxLength) {
   return `${text.slice(0, maxLength).trim()}...`;
 }
 
-function buildRetrievalQuery({ message, currentUrl, currentTitle }) {
-  return [message, currentTitle, currentUrl].filter(Boolean).join("\n");
+function buildRetrievalQuery({ message, currentUrl, currentTitle, memory }) {
+  // Include the last couple of customer turns and key need-facts so follow-ups
+  // ("is there a lighter one?") still retrieve on the original topic.
+  const customerTurns = (memory?.messages || [])
+    .filter((item) => item.role === "customer")
+    .map((item) => item.content);
+  const recent = customerTurns.length ? customerTurns.slice(-2) : [message];
+  const facts = memory?.facts || {};
+  const needFacts = ["condition", "mobility_needs", "use_area", "transport", "weight"]
+    .map((key) => facts[key])
+    .filter(Boolean);
+  return [...recent, ...needFacts, currentTitle, currentUrl].filter(Boolean).join("\n");
 }
 
 function formatProductMetadata(product) {
