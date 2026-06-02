@@ -307,6 +307,7 @@
   gap: 12px;
   padding: 20px 18px 12px;
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--blm-surface);
 }
 
@@ -390,12 +391,18 @@
 /* Honeypot: kept in the DOM and off-screen (not display:none) so bots fill it
    while real users never see it. */
 .biolec-chat__hp {
-  position: absolute;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+  position: absolute !important;
+  left: -9999px !important;
+  top: auto !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0);
+  pointer-events: none !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .biolec-chat__handoff-open {
