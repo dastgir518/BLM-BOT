@@ -27,5 +27,18 @@ export const config = {
   codexModel: process.env.CODEX_MODEL || "gpt-5.3-codex",
   codexPath: process.env.CODEX_PATH || "",
   answerEngine: process.env.ANSWER_ENGINE || "codex",
-  fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-4.1-mini"
+  fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-4.1-mini",
+  factModel: process.env.FACT_MODEL || process.env.FAST_ANSWER_MODEL || "gpt-4.1-mini",
+  factExtractionEnabled: (process.env.FACT_EXTRACTION_ENABLED || "true").toLowerCase() !== "false",
+  freeMessageLimit: Number(process.env.FREE_MESSAGE_LIMIT || 3),
+  maxMessageLength: Number(process.env.MAX_MESSAGE_LENGTH || 2000),
+  requireChatSignature: (process.env.CHAT_REQUIRE_SIGNATURE || "true").toLowerCase() !== "false",
+  rateLimit: {
+    perMin: Number(process.env.RATE_LIMIT_PER_MIN || 20),
+    perDay: Number(process.env.RATE_LIMIT_PER_DAY || 200),
+    sessionPerMin: Number(process.env.SESSION_RATE_LIMIT_PER_MIN || 10)
+  },
+  dailyAnswerLimit: Number(process.env.DAILY_ANSWER_LIMIT || 3000),
+  moderationEnabled: (process.env.MODERATION_ENABLED || "true").toLowerCase() !== "false",
+  moderationModel: process.env.MODERATION_MODEL || "omni-moderation-latest"
 };

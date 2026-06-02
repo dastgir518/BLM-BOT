@@ -42,8 +42,10 @@ class Biolec_Codex_Bot_Widget
 
         wp_localize_script('biolec-codex-bot-widget', 'BiolecCodexBot', [
             'chatUrl' => esc_url_raw(rest_url('biolec-codex-bot/v1/chat')),
+            'registerUrl' => esc_url_raw(rest_url('biolec-codex-bot/v1/register')),
+            'handoffUrl' => esc_url_raw(rest_url('biolec-codex-bot/v1/handoff')),
             'styleUrl' => esc_url_raw(BIOLEC_CODEX_BOT_URL . 'assets/chat-widget.css'),
-            'welcome' => '<p>Hi, I am Dastgir. I can help you find products, understand delivery, or check order questions.</p>'
+            'welcome' => '<p>Hi, I am Mobi. I can help you find products, understand delivery, or check order questions.</p>'
         ]);
     }
 
@@ -56,10 +58,10 @@ class Biolec_Codex_Bot_Widget
         <div id="biolec-codex-chat" class="biolec-chat" aria-live="polite">
             <div class="biolec-chat__teaser">
                 <button class="biolec-chat__teaser-close" type="button" aria-label="Hide chat prompt">&times;</button>
-                <span>Dastgir</span>
+                <span>Mobi</span>
                 <p>Need help choosing mobility products?</p>
             </div>
-            <button class="biolec-chat__toggle" type="button" aria-expanded="false" aria-controls="biolec-chat-panel" aria-label="Open Dastgir chat">
+            <button class="biolec-chat__toggle" type="button" aria-expanded="false" aria-controls="biolec-chat-panel" aria-label="Open Mobi chat">
                 <span class="biolec-chat__pulse" aria-hidden="true"></span>
                 <span class="biolec-chat__badge" aria-hidden="true">1</span>
                 <svg class="biolec-chat__launcher-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -70,18 +72,52 @@ class Biolec_Codex_Bot_Widget
             <div id="biolec-chat-panel" class="biolec-chat__panel" hidden>
                 <div class="biolec-chat__header">
                     <div class="biolec-chat__brand">
-                        <span class="biolec-chat__brand-mark">D</span>
+                        <span class="biolec-chat__brand-mark">M</span>
                         <div>
-                            <strong>Dastgir</strong>
+                            <strong>Mobi</strong>
                             <span><i></i>Bio-Lec assistant</span>
                         </div>
                     </div>
+                    <button class="biolec-chat__a11y-toggle" type="button" aria-label="Accessibility options" aria-expanded="false">Aa</button>
+                    <button class="biolec-chat__new" type="button" aria-label="Start new chat">New chat</button>
                     <button class="biolec-chat__close" type="button" aria-label="Close chat">
                         <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                             <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
                         </svg>
                     </button>
                 </div>
+                <div class="biolec-chat__a11y" hidden>
+                    <div class="biolec-chat__a11y-row">
+                        <span>Text size</span>
+                        <div class="biolec-chat__a11y-textsize" role="group" aria-label="Text size">
+                            <button type="button" data-textsize="normal" aria-label="Normal text">A</button>
+                            <button type="button" data-textsize="large" aria-label="Large text">A+</button>
+                            <button type="button" data-textsize="larger" aria-label="Larger text">A++</button>
+                        </div>
+                    </div>
+                    <label class="biolec-chat__a11y-row">
+                        <span>High contrast</span>
+                        <input type="checkbox" class="biolec-chat__a11y-contrast">
+                    </label>
+                    <label class="biolec-chat__a11y-row">
+                        <span>Read replies aloud</span>
+                        <input type="checkbox" class="biolec-chat__a11y-autoread">
+                    </label>
+                </div>
+                <input class="biolec-chat__hp" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+                <form class="biolec-chat__start">
+                    <strong>Start chat</strong>
+                    <label>
+                        <span>Name</span>
+                        <input class="biolec-chat__start-name" type="text" autocomplete="name" required>
+                    </label>
+                    <label>
+                        <span>Email</span>
+                        <input class="biolec-chat__start-email" type="email" autocomplete="email" required>
+                    </label>
+                    <p class="biolec-chat__start-error" role="alert" hidden></p>
+                    <button type="submit">Continue</button>
+                </form>
                 <div class="biolec-chat__messages"></div>
                 <div class="biolec-chat__prompts">
                     <button type="button" class="biolec-chat__prompt" data-prompt="I need help choosing a mobility scooter">
@@ -111,8 +147,39 @@ class Biolec_Codex_Bot_Widget
                     <button type="button" data-prompt="How does delivery work?">Delivery</button>
                     <button type="button" data-prompt="How do I claim VAT relief?">VAT relief</button>
                 </div>
+                <form class="biolec-chat__handoff-form" hidden>
+                    <strong>Talk to a team member</strong>
+                    <p class="biolec-chat__handoff-intro">Leave your details and our team will get back to you by email or phone.</p>
+                    <label>
+                        <span>Name</span>
+                        <input class="biolec-chat__handoff-name" type="text" autocomplete="name" required>
+                    </label>
+                    <label>
+                        <span>Email</span>
+                        <input class="biolec-chat__handoff-email" type="email" autocomplete="email" required>
+                    </label>
+                    <label>
+                        <span>Phone (optional)</span>
+                        <input class="biolec-chat__handoff-phone" type="tel" autocomplete="tel">
+                    </label>
+                    <label>
+                        <span>How can we help? (optional)</span>
+                        <textarea class="biolec-chat__handoff-message" rows="2"></textarea>
+                    </label>
+                    <p class="biolec-chat__handoff-error" role="alert" hidden></p>
+                    <div class="biolec-chat__handoff-actions">
+                        <button type="submit">Send to team</button>
+                        <button type="button" class="biolec-chat__handoff-cancel">Cancel</button>
+                    </div>
+                </form>
                 <form class="biolec-chat__form">
                     <div class="biolec-chat__composer">
+                        <button class="biolec-chat__mic" type="button" aria-label="Speak your message" hidden>
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"></path>
+                                <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                            </svg>
+                        </button>
                         <textarea class="biolec-chat__input" rows="1" autocomplete="off" placeholder="Ask about products, delivery, or orders" aria-label="Message"></textarea>
                         <button class="biolec-chat__send" type="submit" aria-label="Send message">
                             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -121,7 +188,7 @@ class Biolec_Codex_Bot_Widget
                         </button>
                     </div>
                     <div class="biolec-chat__foot">
-                        <span>Powered by Bio-Lec Mobility</span>
+                        <button type="button" class="biolec-chat__handoff-open">Talk to a team member</button>
                         <span>Press Enter</span>
                     </div>
                 </form>

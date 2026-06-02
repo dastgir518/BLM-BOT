@@ -1,5 +1,6 @@
 const MAX_MESSAGES = 8;
 const MAX_FACTS = 20;
+const SESSION_TTL_MS = 60 * 60 * 1000;
 const sessions = new Map();
 
 export function getSessionMemory(sessionId) {
@@ -19,18 +20,65 @@ export function rememberUserMessage(sessionId, message) {
   mergeFacts(session.facts, extractFacts(message));
 }
 
+export function rememberCustomer(sessionId, { name, email } = {}) {
+  const session = getSession(sessionId);
+  if (name) session.facts.customer_name = String(name).trim();
+  if (email) session.facts.email = String(email).trim().toLowerCase();
+}
+
+// Merge an arbitrary set of extracted facts (e.g. from the LLM extractor) into
+// the session memory. Values take precedence over earlier regex-derived facts.
+export function rememberFacts(sessionId, facts = {}) {
+  if (!facts || typeof facts !== "object") return;
+  const session = getSession(sessionId);
+  mergeFacts(session.facts, facts);
+}
+
 export function rememberAssistantMessage(sessionId, answer) {
   const session = getSession(sessionId);
   session.messages.push({ role: "assistant", content: stripHtml(answer) });
   session.messages = session.messages.slice(-MAX_MESSAGES);
 }
 
+// Tracks whether a returning customer's saved profile has been loaded into this
+// session yet, so we only read it from the database once per session.
+export function isProfileLoaded(sessionId) {
+  return Boolean(getSession(sessionId).profileLoaded);
+}
+
+export function markProfileLoaded(sessionId) {
+  getSession(sessionId).profileLoaded = true;
+}
+
 function getSession(sessionId) {
   const key = sessionId || "anonymous";
-  if (!sessions.has(key)) {
-    sessions.set(key, { facts: {}, messages: [], customerTurns: 0 });
+  const existing = sessions.get(key);
+  if (existing && Date.now() - existing.updatedAt <= SESSION_TTL_MS) {
+    existing.updatedAt = Date.now();
+    return existing;
   }
+
+  if (!sessions.has(key)) {
+    sessions.set(key, createSession());
+  } else {
+    sessions.set(key, createSession());
+  }
+
+  pruneExpiredSessions();
   return sessions.get(key);
+}
+
+function createSession() {
+  return { facts: {}, messages: [], customerTurns: 0, profileLoaded: false, updatedAt: Date.now() };
+}
+
+function pruneExpiredSessions() {
+  const now = Date.now();
+  for (const [key, session] of sessions.entries()) {
+    if (now - session.updatedAt > SESSION_TTL_MS) {
+      sessions.delete(key);
+    }
+  }
 }
 
 function mergeFacts(target, facts) {

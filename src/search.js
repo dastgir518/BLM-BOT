@@ -129,6 +129,36 @@ function escapeIlike(value) {
   return String(value).replace(/[%_]/g, "\\$&");
 }
 
+// Directly fetch the product a customer is viewing (by page URL) so its full
+// specifications are guaranteed in context, regardless of semantic ranking.
+export async function getProductByUrl(url) {
+  const base = normalizeUrl(url);
+  if (!base) return null;
+
+  const { data, error } = await supabase
+    .from("product_documents")
+    .select("title, url, content, metadata")
+    .ilike("url", `${escapeIlike(base)}%`)
+    .limit(8);
+
+  if (error) throw error;
+  if (!data || !data.length) return null;
+
+  const specChunk = data.find((row) => row.metadata?.chunk_kind === "specifications");
+  const row = specChunk || data[0];
+  return {
+    title: row.title,
+    url: row.url,
+    specifications: row.metadata?.specifications || ""
+  };
+}
+
+function normalizeUrl(url) {
+  const text = String(url || "").trim();
+  if (!text) return "";
+  return text.split(/[?#]/)[0].replace(/\/+$/, "");
+}
+
 export async function semanticPageSearch({ query, matchCount = 5 }) {
   if (!query) {
     throw new Error("Search query is required");

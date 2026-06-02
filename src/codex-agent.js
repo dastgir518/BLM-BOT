@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { semanticPageSearch, semanticProductSearch } from "./search.js";
+import { semanticPageSearch, semanticProductSearch, getProductByUrl } from "./search.js";
 import { config } from "./config.js";
 
 let codex = null;
 const sessions = new Map();
 
 const instructions = `
-You are Dastgir, Bio Lec Mobility's expert product adviser and senior mobility sales consultant.
+You are Mobi, Bio Lec Mobility's expert product adviser and senior mobility sales consultant.
 
 You help customers with mobility products, delivery, VAT relief, checkout, returns, and order questions.
 Use retrieved product and policy context as the source of truth. Do not invent prices, stock, delivery times, or order details.
@@ -15,10 +15,12 @@ Do not claim that you searched the web, browsed the site, checked live stock, or
 If no relevant retrieved context is included, say that the product/policy index does not have enough information yet and offer to connect the customer with Bio Lec Mobility.
 Never reveal internal supplier, vendor, wholesale, cost of goods, admin, SEO, edit, analytics, or hidden configuration fields, even if they appear in context.
 For medical suitability, diagnosis, or clinical advice, recommend contacting Bio Lec Mobility or a qualified healthcare professional.
+If the customer wants to speak to a person, is unhappy, or you cannot help, invite them to use the "Talk to a team member" button in this chat so the Bio Lec team can follow up by email or phone.
 For refunds, damaged goods, complaints, legal questions, urgent delivery, or uncertain order issues, escalate to human support.
 For order questions, use provided WooCommerce order context as the source of truth. If order context says billing email is needed, ask for the billing email address. If no order is found for that email, ask for the order number. Do not reveal order details when an email mismatch is reported.
-When an order is processing and order notes are provided, use the latest WooCommerce notes to explain delivery or tracking information. Keep order answers concise and include the status, delivery/tracking detail if available, and one helpful next step.
+When order notes are provided, use the latest WooCommerce notes to explain delivery or tracking information regardless of order status. Keep order answers concise and include the status, delivery/tracking detail if available, and one helpful next step.
 When recommending products, explain the practical reason and include product links when available.
+When the customer asks about a product's specifications (dimensions, weight, maximum user weight, range, seat width, etc.), answer from that product's Specifications section in the retrieved context. If a specific figure is not present there, say you will check with the team rather than guessing.
 Act like an expert salesperson: warm, confident, practical, and focused on helping the customer choose the right product, not just any product.
 Use a staged sales flow. Ask smart qualifying questions only when they would change the recommendation. Use the product category, customer message, remembered customer details, and customer turn count to decide what to ask.
 For a new product-choice conversation, the first assistant reply should ask for the baseline customer profile before recommending: age, height, approximate weight, and any disability, illness, condition, pain, balance issue, or mobility limitation that affects product use.
@@ -116,9 +118,10 @@ function getThread(sessionId) {
 export async function answerWithCodex({ sessionId, message, currentUrl = "", currentTitle = "", memory = null, orderContext = "" }) {
   const startedAt = Date.now();
   const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle });
-  const [products, pages] = await Promise.all([
+  const [products, pages, viewedProduct] = await Promise.all([
     timed("productSearch", () => semanticProductSearch({ query: retrievalQuery, matchCount: 12 }).catch(() => [])),
-    timed("pageSearch", () => semanticPageSearch({ query: retrievalQuery, matchCount: 3 }).catch(() => []))
+    timed("pageSearch", () => semanticPageSearch({ query: retrievalQuery, matchCount: 3 }).catch(() => [])),
+    currentUrl ? getProductByUrl(currentUrl).catch(() => null) : Promise.resolve(null)
   ]);
 
   const productContext = products
@@ -130,7 +133,7 @@ export async function answerWithCodex({ sessionId, message, currentUrl = "", cur
         `Price: ${product.metadata?.price || "unknown"}`,
         `Similarity: ${product.similarity}`,
         formatProductMetadata(product),
-        trimContext(product.content, 700)
+        trimContext(product.content, 2000)
       ].join("\n");
     })
     .join("\n\n---\n\n");
@@ -146,11 +149,16 @@ export async function answerWithCodex({ sessionId, message, currentUrl = "", cur
     })
     .join("\n\n---\n\n");
 
+  const viewedProductContext = viewedProduct && viewedProduct.specifications
+    ? `Specifications for the product the customer is viewing (${viewedProduct.title}):\n${trimContext(viewedProduct.specifications, 3000)}`
+    : "";
+
   const prompt = [
     instructions,
     currentUrl ? `Customer is currently viewing:\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
     formatMemory(memory),
     orderContext ? `WooCommerce order context:\n${orderContext}` : "",
+    viewedProductContext,
     productContext ? `Relevant product knowledge:\n${productContext}` : "No product context was retrieved.",
     pageContext ? `Relevant policy/page knowledge:\n${pageContext}` : "No policy/page context was retrieved.",
     `Customer message:\n${message}`
@@ -201,19 +209,26 @@ function buildRetrievalQuery({ message, currentUrl, currentTitle }) {
 }
 
 function formatProductMetadata(product) {
+  // Preferred: the full specifications blob built at index time.
+  const specifications = product.metadata?.specifications;
+  if (specifications) {
+    return `Specifications:\n${trimContext(specifications, 3000)}`;
+  }
+
+  // Fallback for rows indexed before the specifications blob existed.
   const rawMeta = product.metadata?.raw_meta || {};
   const metaData = Array.isArray(product.metadata?.meta_data) ? product.metadata.meta_data : [];
   const lines = [];
 
   for (const key of ["table-box", "product_faq_html", "custom_category_field"]) {
     if (rawMeta[key]) {
-      lines.push(`${key}: ${trimContext(rawMeta[key], 1200)}`);
+      lines.push(`${key}: ${trimContext(rawMeta[key], 2000)}`);
     }
   }
 
   const usefulMeta = metaData
     .filter((item) => ["table-box", "product_faq_html", "custom_category_field"].includes(item.key))
-    .map((item) => `${item.key}: ${trimContext(item.value, 1200)}`);
+    .map((item) => `${item.key}: ${trimContext(item.value, 2000)}`);
 
   lines.push(...usefulMeta);
   return lines.length ? `Useful product details:\n${lines.join("\n")}` : "";

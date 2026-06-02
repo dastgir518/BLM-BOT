@@ -1,12 +1,57 @@
 (function () {
-  function getSessionId() {
-    var key = 'biolec_codex_session_id';
-    var existing = window.localStorage.getItem(key);
-    if (existing) return existing;
+  var SESSION_KEY = 'biolec_codex_session_id';
+  var SESSION_CREATED_KEY = 'biolec_codex_session_created_at';
+  var PROFILE_KEY = 'biolec_codex_profile';
+  var SESSION_TTL_MS = 60 * 60 * 1000;
+  var A11Y_TEXTSIZE_KEY = 'biolec_a11y_textsize';
+  var A11Y_CONTRAST_KEY = 'biolec_a11y_contrast';
+  var A11Y_AUTOREAD_KEY = 'biolec_a11y_autoread';
 
+  function getSessionId() {
+    var existing = window.localStorage.getItem(SESSION_KEY);
+    var createdAt = Number(window.localStorage.getItem(SESSION_CREATED_KEY) || 0);
+    if (existing && createdAt && Date.now() - createdAt <= SESSION_TTL_MS) return existing;
+
+    return resetSession();
+  }
+
+  function resetSession() {
     var created = 'session_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    window.localStorage.setItem(key, created);
+    window.localStorage.setItem(SESSION_KEY, created);
+    window.localStorage.setItem(SESSION_CREATED_KEY, String(Date.now()));
+    window.localStorage.removeItem(PROFILE_KEY);
     return created;
+  }
+
+  // Start a fresh conversation thread but KEEP the stored profile, so a known
+  // customer stays identified across "New chat" (no re-gate, no re-asking).
+  function newThread() {
+    var created = 'session_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    window.localStorage.setItem(SESSION_KEY, created);
+    window.localStorage.setItem(SESSION_CREATED_KEY, String(Date.now()));
+    return created;
+  }
+
+  function getProfile() {
+    var createdAt = Number(window.localStorage.getItem(SESSION_CREATED_KEY) || 0);
+    if (!createdAt || Date.now() - createdAt > SESSION_TTL_MS) {
+      resetSession();
+      return null;
+    }
+
+    try {
+      return JSON.parse(window.localStorage.getItem(PROFILE_KEY) || 'null');
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function setProfile(profile) {
+    window.localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  }
+
+  function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email || '');
   }
 
   function sanitizeAssistantHtml(html) {
@@ -57,13 +102,42 @@
     var message = document.createElement('div');
     message.className = 'biolec-chat__message biolec-chat__message--' + role;
     if (role === 'bot') {
-      message.innerHTML = sanitizeAssistantHtml(text);
+      renderBotMessage(message, text);
     } else {
       message.textContent = text;
     }
     container.appendChild(message);
     container.scrollTop = container.scrollHeight;
     return message;
+  }
+
+  // Bot messages render into a content bubble with a sibling speak button, so
+  // updating the text (renderBotMessage again) keeps the read-aloud control.
+  function renderBotMessage(message, html) {
+    message.innerHTML = '';
+    var bubble = document.createElement('div');
+    bubble.className = 'biolec-chat__bubble';
+    bubble.innerHTML = sanitizeAssistantHtml(html);
+    message.appendChild(bubble);
+
+    if (window.speechSynthesis) {
+      var speak = document.createElement('button');
+      speak.type = 'button';
+      speak.className = 'biolec-chat__speak';
+      speak.setAttribute('aria-label', 'Read this message aloud');
+      speak.textContent = '🔊';
+      message.appendChild(speak);
+    }
+  }
+
+  function speakText(text) {
+    if (!window.speechSynthesis) return;
+    var clean = String(text || '').trim();
+    if (!clean) return;
+    window.speechSynthesis.cancel();
+    var utterance = new SpeechSynthesisUtterance(clean);
+    utterance.lang = 'en-GB';
+    window.speechSynthesis.speak(utterance);
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -75,6 +149,12 @@
     var toggle = scope.querySelector('.biolec-chat__toggle');
     var panel = scope.querySelector('.biolec-chat__panel');
     var close = scope.querySelector('.biolec-chat__close');
+    var newChat = scope.querySelector('.biolec-chat__new');
+    var start = scope.querySelector('.biolec-chat__start');
+    var startName = scope.querySelector('.biolec-chat__start-name');
+    var startEmail = scope.querySelector('.biolec-chat__start-email');
+    var startError = scope.querySelector('.biolec-chat__start-error');
+    var startSubmit = start && start.querySelector('button[type="submit"]');
     var teaser = scope.querySelector('.biolec-chat__teaser');
     var teaserClose = scope.querySelector('.biolec-chat__teaser-close');
     var messages = scope.querySelector('.biolec-chat__messages');
@@ -82,19 +162,89 @@
     var input = scope.querySelector('.biolec-chat__input');
     var quick = scope.querySelector('.biolec-chat__quick');
     var prompts = scope.querySelector('.biolec-chat__prompts');
+    var honeypot = scope.querySelector('.biolec-chat__hp');
+    var handoffForm = scope.querySelector('.biolec-chat__handoff-form');
+    var handoffName = scope.querySelector('.biolec-chat__handoff-name');
+    var handoffEmail = scope.querySelector('.biolec-chat__handoff-email');
+    var handoffPhone = scope.querySelector('.biolec-chat__handoff-phone');
+    var handoffMessage = scope.querySelector('.biolec-chat__handoff-message');
+    var handoffError = scope.querySelector('.biolec-chat__handoff-error');
+    var handoffCancel = scope.querySelector('.biolec-chat__handoff-cancel');
+    var handoffSubmit = handoffForm && handoffForm.querySelector('button[type="submit"]');
+    var a11yToggle = scope.querySelector('.biolec-chat__a11y-toggle');
+    var a11yPanel = scope.querySelector('.biolec-chat__a11y');
+    var contrastCheckbox = scope.querySelector('.biolec-chat__a11y-contrast');
+    var autoReadCheckbox = scope.querySelector('.biolec-chat__a11y-autoread');
+    var mic = scope.querySelector('.biolec-chat__mic');
+    var pendingMessage = null;
 
-    addMessage(messages, 'bot', window.BiolecCodexBot.welcome);
+    initializeChat();
+
+    // Soft gate: the conversation opens straight to the composer. The name/email
+    // form is only revealed when the server asks for it (after the free messages).
+    // Pass welcomeHtml to override the greeting; pass '' to show no welcome.
+    function initializeChat(welcomeHtml) {
+      if (start) start.hidden = true;
+      messages.hidden = false;
+      form.hidden = false;
+      if (quick) quick.hidden = false;
+      if (prompts) prompts.hidden = false;
+      messages.innerHTML = '';
+      var welcome = welcomeHtml === undefined ? window.BiolecCodexBot.welcome : welcomeHtml;
+      if (welcome) addMessage(messages, 'bot', welcome);
+    }
+
+    function showStartForm() {
+      if (!start) return;
+      start.hidden = false;
+      showStartError('');
+      if (startName) startName.focus();
+    }
+
+    // Register the current session with the server. Returns the response data
+    // ({ returning, greeting }); throws on failure.
+    async function registerSession(name, email) {
+      if (!window.BiolecCodexBot.registerUrl) return {};
+      var response = await fetch(window.BiolecCodexBot.registerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: getSessionId(),
+          customer_name: name,
+          customer_email: email,
+          current_url: window.location.href,
+          current_title: document.title || '',
+          hp_field: honeypot ? honeypot.value : ''
+        })
+      });
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok) throw new Error(data.error || 'Could not start the chat. Please try again.');
+      return data;
+    }
+
+    var bodyOverflowPrev = '';
+    function isMobileView() {
+      return window.matchMedia('(max-width: 640px)').matches;
+    }
 
     function openPanel() {
       panel.hidden = false;
       if (teaser) teaser.hidden = true;
       toggle.setAttribute('aria-expanded', 'true');
+      scope.classList.add('biolec-chat--open');
+      // Lock the page behind the full-screen chat on mobile.
+      if (isMobileView()) {
+        bodyOverflowPrev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+      }
       input.focus();
     }
 
     function closePanel() {
       panel.hidden = true;
       toggle.setAttribute('aria-expanded', 'false');
+      scope.classList.remove('biolec-chat--open');
+      document.body.style.overflow = bodyOverflowPrev || '';
     }
 
     toggle.addEventListener('click', function () {
@@ -106,6 +256,80 @@
     });
 
     close.addEventListener('click', closePanel);
+
+    if (newChat) {
+      newChat.addEventListener('click', async function () {
+        if (!window.confirm('Start a new chat? This clears the current conversation.')) return;
+
+        var profile = getProfile();
+        newThread();
+        pendingMessage = null;
+        input.value = '';
+        resizeInput();
+
+        if (profile && profile.name && profile.email) {
+          // Keep the customer identified: open a fresh thread and greet them.
+          initializeChat('');
+          try {
+            var data = await registerSession(profile.name, profile.email);
+            addMessage(messages, 'bot', data.greeting || window.BiolecCodexBot.welcome);
+          } catch (_error) {
+            addMessage(messages, 'bot', window.BiolecCodexBot.welcome);
+          }
+        } else {
+          initializeChat();
+        }
+        input.focus();
+      });
+    }
+
+    if (start) {
+      start.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var name = (startName && startName.value || '').trim();
+        var email = (startEmail && startEmail.value || '').trim().toLowerCase();
+        showStartError('');
+        if (!name) return showStartError('Please enter your name.');
+        if (!isValidEmail(email)) return showStartError('Please enter a valid email address.');
+
+        setStartBusy(true);
+        try {
+          var data = await registerSession(name, email);
+          setProfile({ name: name, email: email });
+          start.hidden = true;
+          if (startName) startName.value = '';
+          if (startEmail) startEmail.value = '';
+          input.focus();
+
+          // Greet a recognised returning customer (name-only).
+          if (data.greeting) addMessage(messages, 'bot', data.greeting);
+
+          // Resume the message that triggered the gate, without re-echoing it.
+          if (pendingMessage) {
+            var resume = pendingMessage;
+            pendingMessage = null;
+            sendMessage(resume, { skipEcho: true });
+          }
+        } catch (error) {
+          showStartError(error.message || 'Could not start the chat. Please try again.');
+        } finally {
+          setStartBusy(false);
+        }
+      });
+    }
+
+    function showStartError(text) {
+      if (!startError) return;
+      startError.textContent = text || '';
+      startError.hidden = !text;
+    }
+
+    function setStartBusy(busy) {
+      if (startSubmit) {
+        startSubmit.disabled = busy;
+        startSubmit.textContent = busy ? 'Starting...' : 'Continue';
+      }
+    }
 
     if (teaserClose) {
       teaserClose.addEventListener('click', function () {
@@ -147,16 +371,20 @@
       });
     }
 
-    form.addEventListener('submit', async function (event) {
+    form.addEventListener('submit', function (event) {
       event.preventDefault();
-
       var text = input.value.trim();
       if (!text) return;
-
       input.value = '';
       resizeInput();
+      sendMessage(text, { skipEcho: false });
+    });
+
+    async function sendMessage(text, options) {
+      var skipEcho = options && options.skipEcho;
+      var profile = getProfile() || {};
       if (prompts) prompts.hidden = true;
-      addMessage(messages, 'user', text);
+      if (!skipEcho) addMessage(messages, 'user', text);
       var pending = addMessage(messages, 'bot', '<p>One moment...</p>');
 
       try {
@@ -167,18 +395,266 @@
             session_id: getSessionId(),
             message: text,
             current_url: window.location.href,
-            current_title: document.title || ''
+            current_title: document.title || '',
+            customer_name: profile.name || '',
+            customer_email: profile.email || '',
+            hp_field: honeypot ? honeypot.value : ''
           })
         });
 
-        var data = await response.json();
+        var data = await response.json().catch(function () { return {}; });
+        if (response.status === 429) {
+          renderBotMessage(pending, '<p>' + (data.error || 'You are sending messages too quickly. Please wait a moment and try again.') + '</p>');
+          return;
+        }
         if (!response.ok) throw new Error(data.error || 'Request failed');
-        pending.innerHTML = sanitizeAssistantHtml(data.answer || '<p>Sorry, I could not answer that just now.</p>');
+
+        // Soft gate: the server needs the customer's details to continue.
+        if (data.require_email) {
+          pendingMessage = text;
+          renderBotMessage(pending, '<p>To carry on helping you, please pop your name and email in below. It only takes a moment.</p>');
+          showStartForm();
+          return;
+        }
+
+        renderBotMessage(pending, data.answer || '<p>Sorry, I could not answer that just now.</p>');
+        maybeAutoSpeak(pending);
+
+        // The server detected the customer may want a person; offer a handoff.
+        if (data.offer_handoff) addHandoffCta();
       } catch (error) {
-        pending.innerHTML = sanitizeAssistantHtml('<p>' + (error.message || 'Sorry, I could not connect to the assistant. Please contact our team for help.') + '</p>');
+        renderBotMessage(pending, '<p>' + (error.message || 'Sorry, I could not connect to the assistant. Please contact our team for help.') + '</p>');
+      }
+    }
+
+    // --- Human handoff -------------------------------------------------------
+
+    function openHandoff() {
+      if (!handoffForm) return;
+      var profile = getProfile() || {};
+      if (handoffName && !handoffName.value) handoffName.value = profile.name || '';
+      if (handoffEmail && !handoffEmail.value) handoffEmail.value = profile.email || '';
+      showHandoffError('');
+      handoffForm.hidden = false;
+      handoffForm.scrollIntoView({ block: 'nearest' });
+      if (handoffName) handoffName.focus();
+    }
+
+    function addHandoffCta() {
+      var cta = document.createElement('div');
+      cta.className = 'biolec-chat__message biolec-chat__message--bot biolec-chat__cta';
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'biolec-chat__handoff-open';
+      button.textContent = 'Talk to a team member';
+      cta.appendChild(button);
+      messages.appendChild(cta);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function showHandoffError(text) {
+      if (!handoffError) return;
+      handoffError.textContent = text || '';
+      handoffError.hidden = !text;
+    }
+
+    function collectTranscript() {
+      var nodes = messages.querySelectorAll('.biolec-chat__message');
+      var turns = [];
+      Array.prototype.slice.call(nodes).forEach(function (node) {
+        if (node.classList.contains('biolec-chat__cta')) return;
+        var role = node.classList.contains('biolec-chat__message--user') ? 'user' : 'bot';
+        var content = (node.textContent || '').trim();
+        if (content) turns.push({ role: role, content: content });
+      });
+      return turns.slice(-40);
+    }
+
+    // Delegated: handles the always-visible foot button and any inline CTA.
+    scope.addEventListener('click', function (event) {
+      if (event.target.closest('.biolec-chat__handoff-open')) {
+        event.preventDefault();
+        openHandoff();
       }
     });
+
+    if (handoffCancel) {
+      handoffCancel.addEventListener('click', function () {
+        handoffForm.hidden = true;
+        showHandoffError('');
+      });
+    }
+
+    if (handoffForm) {
+      handoffForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        var name = (handoffName && handoffName.value || '').trim();
+        var email = (handoffEmail && handoffEmail.value || '').trim().toLowerCase();
+        showHandoffError('');
+        if (!name) return showHandoffError('Please enter your name.');
+        if (!isValidEmail(email)) return showHandoffError('Please enter a valid email address.');
+        if (!window.BiolecCodexBot.handoffUrl) return showHandoffError('Sorry, this is unavailable right now.');
+
+        setHandoffBusy(true);
+        try {
+          var response = await fetch(window.BiolecCodexBot.handoffUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: getSessionId(),
+              customer_name: name,
+              customer_email: email,
+              phone: (handoffPhone && handoffPhone.value || '').trim(),
+              message: (handoffMessage && handoffMessage.value || '').trim(),
+              transcript: collectTranscript(),
+              current_url: window.location.href,
+              hp_field: honeypot ? honeypot.value : ''
+            })
+          });
+          var data = await response.json().catch(function () { return {}; });
+          if (!response.ok) throw new Error(data.error || 'Could not send your request. Please try again.');
+
+          handoffForm.hidden = true;
+          if (handoffMessage) handoffMessage.value = '';
+          addMessage(messages, 'bot', '<p>Thanks ' + escapeText(name) + ', our team has your details and will get back to you at ' + escapeText(email) + ' shortly.</p>');
+        } catch (error) {
+          showHandoffError(error.message || 'Could not send your request. Please try again.');
+        } finally {
+          setHandoffBusy(false);
+        }
+      });
+    }
+
+    function setHandoffBusy(busy) {
+      if (handoffSubmit) {
+        handoffSubmit.disabled = busy;
+        handoffSubmit.textContent = busy ? 'Sending...' : 'Send to team';
+      }
+    }
+
+    // --- Accessibility: read-aloud, voice input, text size, contrast ---------
+
+    function autoReadEnabled() {
+      return window.localStorage.getItem(A11Y_AUTOREAD_KEY) === '1';
+    }
+
+    function maybeAutoSpeak(messageEl) {
+      if (!autoReadEnabled()) return;
+      var bubble = messageEl.querySelector('.biolec-chat__bubble');
+      if (bubble) speakText(bubble.textContent);
+    }
+
+    // Delegated: read-aloud buttons on bot messages.
+    scope.addEventListener('click', function (event) {
+      var speakBtn = event.target.closest('.biolec-chat__speak');
+      if (!speakBtn) return;
+      var bubble = speakBtn.parentNode.querySelector('.biolec-chat__bubble');
+      if (bubble) speakText(bubble.textContent);
+    });
+
+    function applyAccessibilitySettings() {
+      var size = window.localStorage.getItem(A11Y_TEXTSIZE_KEY) || 'normal';
+      scope.classList.remove('biolec-a11y-text-large', 'biolec-a11y-text-larger');
+      if (size === 'large') scope.classList.add('biolec-a11y-text-large');
+      if (size === 'larger') scope.classList.add('biolec-a11y-text-larger');
+
+      var contrast = window.localStorage.getItem(A11Y_CONTRAST_KEY) === '1';
+      scope.classList.toggle('biolec-a11y-contrast', contrast);
+      if (contrastCheckbox) contrastCheckbox.checked = contrast;
+      if (autoReadCheckbox) autoReadCheckbox.checked = autoReadEnabled();
+
+      var sizeButtons = a11yPanel ? a11yPanel.querySelectorAll('[data-textsize]') : [];
+      Array.prototype.slice.call(sizeButtons).forEach(function (button) {
+        button.classList.toggle('is-active', button.dataset.textsize === size);
+      });
+    }
+
+    if (a11yToggle && a11yPanel) {
+      a11yToggle.addEventListener('click', function () {
+        a11yPanel.hidden = !a11yPanel.hidden;
+        a11yToggle.setAttribute('aria-expanded', String(!a11yPanel.hidden));
+      });
+    }
+
+    if (a11yPanel) {
+      a11yPanel.addEventListener('click', function (event) {
+        var button = event.target.closest('[data-textsize]');
+        if (!button) return;
+        window.localStorage.setItem(A11Y_TEXTSIZE_KEY, button.dataset.textsize);
+        applyAccessibilitySettings();
+      });
+    }
+
+    if (contrastCheckbox) {
+      contrastCheckbox.addEventListener('change', function () {
+        window.localStorage.setItem(A11Y_CONTRAST_KEY, contrastCheckbox.checked ? '1' : '');
+        applyAccessibilitySettings();
+      });
+    }
+
+    if (autoReadCheckbox) {
+      autoReadCheckbox.addEventListener('change', function () {
+        window.localStorage.setItem(A11Y_AUTOREAD_KEY, autoReadCheckbox.checked ? '1' : '');
+        if (!autoReadCheckbox.checked && window.speechSynthesis) window.speechSynthesis.cancel();
+      });
+    }
+
+    applyAccessibilitySettings();
+
+    // Voice input via the Web Speech API, only where supported.
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (mic && SpeechRecognition) {
+      mic.hidden = false;
+      var recognition = new SpeechRecognition();
+      recognition.lang = 'en-GB';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      var listening = false;
+
+      mic.addEventListener('click', function () {
+        if (listening) {
+          recognition.stop();
+          return;
+        }
+        try {
+          recognition.start();
+        } catch (_error) {
+          // start() throws if already started; ignore.
+        }
+      });
+
+      recognition.addEventListener('start', function () {
+        listening = true;
+        mic.classList.add('is-listening');
+      });
+
+      recognition.addEventListener('result', function (event) {
+        var transcript = '';
+        for (var i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        transcript = transcript.trim();
+        if (transcript) {
+          input.value = (input.value ? input.value + ' ' : '') + transcript;
+          resizeInput();
+          input.focus();
+        }
+      });
+
+      var stopListening = function () {
+        listening = false;
+        mic.classList.remove('is-listening');
+      };
+      recognition.addEventListener('end', stopListening);
+      recognition.addEventListener('error', stopListening);
+    }
   });
+
+  function escapeText(value) {
+    var div = document.createElement('div');
+    div.textContent = String(value || '');
+    return div.innerHTML;
+  }
 
   function mountIsolatedWidget(root) {
     if (!root.attachShadow || root.shadowRoot) {

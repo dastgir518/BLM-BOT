@@ -41,9 +41,7 @@ export async function buildOrderContext({ message, memory }) {
     ].join("\n");
   }
 
-  const notes = lookup.order.status === "processing"
-    ? await getOrderNotes(lookup.order.id).catch(() => [])
-    : [];
+  const notes = await getOrderNotes(lookup.order.id).catch(() => []);
 
   return formatOrderContext(lookup.order, notes);
 }

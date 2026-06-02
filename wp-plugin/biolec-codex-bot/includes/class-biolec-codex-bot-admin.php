@@ -96,6 +96,15 @@ class Biolec_Codex_Bot_Admin
             },
             'default' => false
         ]);
+
+        register_setting(BIOLEC_CODEX_BOT_OPTION_GROUP, 'biolec_codex_bot_support_email', [
+            'type' => 'string',
+            'sanitize_callback' => function ($value) {
+                $emails = array_filter(array_map('sanitize_email', array_map('trim', explode(',', (string) $value))));
+                return implode(', ', $emails);
+            },
+            'default' => ''
+        ]);
     }
 
     public static function render_page()
@@ -149,6 +158,12 @@ class Biolec_Codex_Bot_Admin
                         <label class="biolec-bot-toggle">
                             <input type="checkbox" name="biolec_codex_bot_widget_enabled" value="1" <?php checked(get_option('biolec_codex_bot_widget_enabled'), true); ?>>
                             <span>Storefront chat widget</span>
+                        </label>
+
+                        <label class="biolec-bot-field">
+                            <span>Support team email</span>
+                            <input type="text" name="biolec_codex_bot_support_email" value="<?php echo esc_attr(get_option('biolec_codex_bot_support_email')); ?>" placeholder="<?php echo esc_attr(get_option('admin_email')); ?>">
+                            <small>Where chat handoff requests are emailed. Separate multiple addresses with commas. Defaults to the site admin email.</small>
                         </label>
 
                         <div class="biolec-bot-actions">

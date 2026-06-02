@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Bio Lec Codex Bot Sync
  * Description: Pushes WooCommerce product changes to the Bio Lec Codex bot server for Supabase vector indexing.
- * Version: 0.1.5
+ * Version: 0.1.7
  * Author: Bio Lec Mobility
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('BIOLEC_CODEX_BOT_VERSION', '0.1.5');
+define('BIOLEC_CODEX_BOT_VERSION', '0.1.7');
 define('BIOLEC_CODEX_BOT_OPTION_GROUP', 'biolec_codex_bot_options');
 define('BIOLEC_CODEX_BOT_URL', plugin_dir_url(__FILE__));
 

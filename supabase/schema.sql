@@ -1,4 +1,5 @@
 create extension if not exists vector;
+create extension if not exists pgcrypto;
 
 create table if not exists product_documents (
   id text primary key,
@@ -57,13 +58,34 @@ create table if not exists sync_events (
   created_at timestamptz not null default now()
 );
 
+-- Customer identity captured when the chat is started (name + email).
+-- This is the canonical store for the visitor's details; sessions link to it.
+create table if not exists chat_customers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null,
+  profile jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  constraint chat_customers_email_format check (email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]{2,}$')
+);
+
+-- One row per email address; the email is stored lowercased by the server.
+create unique index if not exists chat_customers_email_key
+  on chat_customers (lower(email));
+
 create table if not exists chat_sessions (
   id text primary key,
+  customer_id uuid references chat_customers(id) on delete cascade,
   codex_thread_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   metadata jsonb default '{}'::jsonb
 );
+
+create index if not exists chat_sessions_customer_id_idx
+  on chat_sessions (customer_id);
 
 create table if not exists chat_messages (
   id bigint generated always as identity primary key,
@@ -74,16 +96,29 @@ create table if not exists chat_messages (
   created_at timestamptz not null default now()
 );
 
+create index if not exists chat_messages_session_id_idx
+  on chat_messages (session_id);
+
+-- Lock down the tables that hold personal data. Row Level Security with no
+-- policies denies all access to the anon/authenticated roles; only the bot
+-- server, which connects with the service-role key, can read or write them.
+alter table chat_customers enable row level security;
+alter table chat_sessions enable row level security;
+alter table chat_messages enable row level security;
+
 create table if not exists support_handoffs (
   id bigint generated always as identity primary key,
   session_id text,
   name text,
   email text,
+  phone text,
   reason text not null,
   transcript jsonb,
   status text not null default 'new',
   created_at timestamptz not null default now()
 );
+
+alter table support_handoffs enable row level security;
 
 create or replace function match_product_documents (
   query_embedding vector(1536),

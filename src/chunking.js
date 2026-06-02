@@ -48,13 +48,26 @@ function valueToText(value) {
 }
 
 const MAX_META_FIELD_LENGTH = 900;
-const MAX_CUSTOM_META_LENGTH = 4500;
-const MAX_CHUNK_CONTENT_LENGTH = 6000;
+const MAX_SPEC_FIELD_LENGTH = 4000;
+const MAX_SPEC_BLOB_LENGTH = 5000;
+const MAX_CUSTOM_META_LENGTH = 6000;
+const MAX_CHUNK_CONTENT_LENGTH = 8000;
 
 function trimText(value, maxLength) {
   const text = String(value || "");
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength).trim()}...`;
+}
+
+// Specification-bearing meta (the store's spec table lives in `table-box`, plus
+// FAQ/spec fields) gets a much larger budget so full spec tables survive.
+function isSpecKey(key = "") {
+  const normalized = String(key).toLowerCase();
+  return normalized === "table-box" || normalized.includes("faq") || normalized.includes("spec");
+}
+
+function metaFieldLimit(key) {
+  return isSpecKey(key) ? MAX_SPEC_FIELD_LENGTH : MAX_META_FIELD_LENGTH;
 }
 
 function metaDataToText(metaData = []) {
@@ -64,7 +77,7 @@ function metaDataToText(metaData = []) {
     .filter((item) => shouldIndexMetaKey(item?.key || item?.name || ""))
     .map((item) => {
       const key = item?.key || item?.name || "";
-      const text = trimText(stripHtml(valueToText(item?.value)), MAX_META_FIELD_LENGTH);
+      const text = trimText(stripHtml(valueToText(item?.value)), metaFieldLimit(key));
       return key && text ? `${key}: ${text}` : "";
     })
     .filter(Boolean)
@@ -78,7 +91,7 @@ function rawMetaToText(rawMeta = {}) {
     .filter(([key]) => shouldIndexMetaKey(key))
     .sort(([a], [b]) => metaPriority(a) - metaPriority(b))
     .map(([key, value]) => {
-      const text = trimText(stripHtml(valueToText(value)), MAX_META_FIELD_LENGTH);
+      const text = trimText(stripHtml(valueToText(value)), metaFieldLimit(key));
       return text ? `${key}: ${text}` : "";
     })
     .filter(Boolean)
@@ -153,10 +166,10 @@ function filteredMetaData(metaData = []) {
 
   return metaData
     .filter((item) => shouldIndexMetaKey(item?.key || item?.name || ""))
-    .map((item) => ({
-      key: item?.key || item?.name || "",
-      value: trimText(stripHtml(valueToText(item?.value)), MAX_META_FIELD_LENGTH)
-    }))
+    .map((item) => {
+      const key = item?.key || item?.name || "";
+      return { key, value: trimText(stripHtml(valueToText(item?.value)), metaFieldLimit(key)) };
+    })
     .filter((item) => item.key && item.value);
 }
 
@@ -166,9 +179,45 @@ function filteredRawMeta(rawMeta = {}) {
   return Object.fromEntries(
     Object.entries(rawMeta)
       .filter(([key]) => shouldIndexMetaKey(key))
-      .map(([key, value]) => [key, trimText(stripHtml(valueToText(value)), MAX_META_FIELD_LENGTH)])
+      .map(([key, value]) => [key, trimText(stripHtml(valueToText(value)), metaFieldLimit(key))])
       .filter(([, value]) => value)
   );
+}
+
+// A clean, generously-sized specifications blob (attributes + dimensions +
+// weight + the spec table) stored in metadata so the agent can read full specs.
+function specMetaText(product) {
+  const lines = [];
+  const rawMeta = product.raw_meta && typeof product.raw_meta === "object" ? product.raw_meta : {};
+  for (const [key, value] of Object.entries(rawMeta)) {
+    if (!isSpecKey(key) || !shouldIndexMetaKey(key)) continue;
+    const text = trimText(stripHtml(valueToText(value)), MAX_SPEC_FIELD_LENGTH);
+    if (text) lines.push(`${key}: ${text}`);
+  }
+
+  const metaData = Array.isArray(product.meta_data) ? product.meta_data : [];
+  for (const item of metaData) {
+    const key = item?.key || item?.name || "";
+    if (!isSpecKey(key) || !shouldIndexMetaKey(key)) continue;
+    const text = trimText(stripHtml(valueToText(item?.value)), MAX_SPEC_FIELD_LENGTH);
+    if (text) lines.push(`${key}: ${text}`);
+  }
+
+  return lines.join("\n");
+}
+
+function buildSpecifications(product) {
+  const attributes = attributesToText(product.attributes);
+  const dimensions = valueToText(product.dimensions);
+  return [
+    attributes ? `Attributes:\n${attributes}` : "",
+    product.weight ? `Weight: ${product.weight}` : "",
+    dimensions ? `Dimensions: ${dimensions}` : "",
+    specMetaText(product)
+  ]
+    .filter(Boolean)
+    .join("\n")
+    .slice(0, MAX_SPEC_BLOB_LENGTH);
 }
 
 function productDetailsToText(product) {
@@ -229,6 +278,7 @@ function baseMetadata(product) {
     images: product.images || [],
     meta_data: filteredMetaData(product.meta_data),
     raw_meta: filteredRawMeta(product.raw_meta),
+    specifications: buildSpecifications(product),
     updated_at: product.updated_at || null
   };
 }
@@ -237,8 +287,8 @@ export function productToChunks(product) {
   const name = stripHtml(product.name);
   const shortDescription = stripHtml(product.short_description);
   const description = stripHtml(product.description);
-  const attributes = attributesToText(product.attributes);
   const productDetails = productDetailsToText(product);
+  const specifications = buildSpecifications(product);
   const metaData = [metaDataToText(product.meta_data), rawMetaToText(product.raw_meta)]
     .filter(Boolean)
     .join("\n")
@@ -262,7 +312,7 @@ export function productToChunks(product) {
     },
     {
       kind: "specifications",
-      content: [`Product: ${name}`, attributes, productDetails].filter(Boolean).join("\n")
+      content: [`Product: ${name}`, specifications ? `Specifications:\n${specifications}` : "", productDetails].filter(Boolean).join("\n")
     },
     {
       kind: "description",

@@ -7,9 +7,14 @@ import { upsertPage, deletePage, clearPages } from "./page-sync.js";
 import { semanticProductSearch, semanticPageSearch } from "./search.js";
 import { answerWithCodex } from "./codex-agent.js";
 import { answerFast } from "./fast-agent.js";
+import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff } from "./chat-store.js";
 import { checkSupabase } from "./health.js";
 import { buildOrderContext } from "./order-lookup.js";
-import { getSessionMemory, rememberAssistantMessage, rememberUserMessage } from "./session-memory.js";
+import { getSessionMemory, rememberAssistantMessage, rememberCustomer, rememberUserMessage, rememberFacts, isProfileLoaded, markProfileLoaded } from "./session-memory.js";
+import { extractCustomerFacts } from "./fact-extraction.js";
+import { rateLimit } from "./rate-limit.js";
+import { isOverDailyLimit, recordAnswer } from "./usage-guard.js";
+import { isFlagged } from "./moderation.js";
 
 const app = express();
 
@@ -125,24 +130,234 @@ app.post("/search/pages", async (req, res, next) => {
   }
 });
 
-app.post("/chat", async (req, res, next) => {
+// Only accept chat traffic that came through the signed WordPress proxy. This
+// removes the direct-to-Node attack path and makes the forwarded client IP
+// trustworthy. Toggle off (CHAT_REQUIRE_SIGNATURE=false) for local dev.
+function chatSignature(req, res, next) {
+  if (!config.requireChatSignature) return next();
+  return verifyWordPressSignature(req, res, next);
+}
+
+const MODERATION_REFUSAL =
+  "<p>I'm sorry, but I can't help with that. If you have a question about our mobility products, delivery, or an order, I'm happy to help.</p>";
+const HIGH_DEMAND_REPLY =
+  "<p>We're experiencing very high demand right now, so I can't reply this moment. Please try again shortly, or contact Bio Lec Mobility directly and the team will be glad to help.</p>";
+const DUPLICATE_REPLY =
+  "<p>It looks like that was just sent. Could you add a little more detail so I can help you better?</p>";
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const HANDOFF_INTENT_PATTERN =
+  /\b(speak|talk|chat|connect)\s+(to|with)\s+(a\s+|an\s+|the\s+)?(human|person|someone|agent|advisor|adviser|representative|rep|staff|team|member|consultant|operator|assistant)\b|\b(real\s+person|human\s+being|call\s+me|phone\s+me|ring\s+me|customer\s+service|customer\s+support|complaint|make\s+a\s+complaint)\b/i;
+
+function detectHandoffIntent(message) {
+  return HANDOFF_INTENT_PATTERN.test(String(message || ""));
+}
+
+app.post("/chat/register", chatSignature, rateLimit, async (req, res, next) => {
   try {
-    const { session_id: sessionId, message, current_url: currentUrl, current_title: currentTitle } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: "message is required" });
+    const {
+      session_id: sessionId,
+      current_url: currentUrl,
+      current_title: currentTitle,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      hp_field: honeypot
+    } = req.body;
+
+    // Honeypot: only bots fill this hidden field. Pretend success, do no work.
+    if (honeypot) {
+      return res.json({ ok: true });
+    }
+    if (!sessionId) {
+      return res.status(400).json({ error: "session_id is required" });
+    }
+    if (!isValidCustomer(customerName, customerEmail)) {
+      return res.status(400).json({ error: "A valid name and email are required to start chat" });
     }
 
-    rememberUserMessage(sessionId, message);
-    const memory = getSessionMemory(sessionId);
-    const orderContext = await buildOrderContext({ message, memory }).catch((error) => {
-      console.error("order lookup failed");
-      console.error(error);
-      return "Order lookup status: lookup_error\nSay you could not check the order just now and offer to connect the customer with Bio Lec Mobility.";
+    // Recognise a returning customer by email and reload their saved profile so
+    // the bot remembers their details without re-asking.
+    const existing = await getCustomerByEmail(customerEmail).catch(() => null);
+    const returning = Boolean(existing);
+
+    await startChatSession({ sessionId, name: customerName, email: customerEmail, currentUrl, currentTitle });
+    rememberCustomer(sessionId, { name: customerName, email: customerEmail });
+    if (existing?.profile) rememberFacts(sessionId, existing.profile);
+    markProfileLoaded(sessionId);
+
+    const greeting = returning
+      ? `<p>Welcome back, ${escapeHtml(customerName.trim())}! Lovely to see you again. How can I help today?</p>`
+      : null;
+    return res.json({ ok: true, returning, greeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Record a human-handoff request. WordPress sends the actual email to the team;
+// this endpoint persists the audit row in support_handoffs.
+app.post("/handoff", chatSignature, rateLimit, async (req, res, next) => {
+  try {
+    const {
+      session_id: sessionId,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      phone,
+      message,
+      transcript,
+      hp_field: honeypot
+    } = req.body;
+
+    if (honeypot) {
+      return res.json({ ok: true });
+    }
+    if (!isValidCustomer(customerName, customerEmail)) {
+      return res.status(400).json({ error: "A valid name and email are required" });
+    }
+
+    await saveSupportHandoff({
+      sessionId,
+      name: customerName,
+      email: customerEmail,
+      phone,
+      reason: message,
+      transcript
     });
+    return res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
+  try {
+    const {
+      session_id: sessionId,
+      message,
+      current_url: currentUrl,
+      current_title: currentTitle,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      hp_field: honeypot
+    } = req.body;
+
+    // Honeypot: silently accept and discard bot submissions (no OpenAI spend).
+    if (honeypot) {
+      return res.json({ answer: "<p>Thanks, your message has been received.</p>" });
+    }
+    if (!sessionId) {
+      return res.status(400).json({ error: "session_id is required" });
+    }
+
+    const trimmed = String(message || "").trim();
+    if (!trimmed) {
+      return res.status(400).json({ error: "message is required" });
+    }
+    if (trimmed.length > config.maxMessageLength) {
+      return res.status(400).json({ error: "Your message is too long. Please shorten it and try again." });
+    }
+
+    const hasEmail = isValidCustomer(customerName, customerEmail);
+    const priorMemory = getSessionMemory(sessionId);
+
+    // Soft gate: anonymous visitors get a few free messages, then must register.
+    // Returns before any OpenAI call so the gate is free to enforce.
+    if (!hasEmail && priorMemory.customerTurns >= config.freeMessageLimit) {
+      return res.json({ require_email: true });
+    }
+
+    // Cheap duplicate guard: do not re-bill OpenAI for an identical resend.
+    const lastCustomer = [...priorMemory.messages].reverse().find((item) => item.role === "customer");
+    if (lastCustomer && lastCustomer.content.trim() === trimmed) {
+      return res.json({ answer: DUPLICATE_REPLY });
+    }
+
+    let customerId = null;
+    if (hasEmail) {
+      customerId = await startChatSession({ sessionId, name: customerName, email: customerEmail, currentUrl, currentTitle });
+      rememberCustomer(sessionId, { name: customerName, email: customerEmail });
+      // Reload the saved profile once per session (covers paths that skip
+      // /chat/register, e.g. an already-identified visitor after a restart).
+      if (!isProfileLoaded(sessionId)) {
+        const existing = await getCustomerByEmail(customerEmail).catch(() => null);
+        if (existing?.profile) rememberFacts(sessionId, existing.profile);
+        markProfileLoaded(sessionId);
+      }
+    } else {
+      await upsertAnonymousSession({ sessionId, currentUrl, currentTitle });
+    }
+
+    rememberUserMessage(sessionId, trimmed);
+    const memory = getSessionMemory(sessionId);
+    await saveChatMessage({
+      sessionId,
+      role: "user",
+      content: trimmed,
+      metadata: { current_url: currentUrl || null, current_title: currentTitle || null }
+    });
+
+    // Moderation pre-check (free) before the expensive answer call.
+    if (await isFlagged(trimmed)) {
+      rememberAssistantMessage(sessionId, MODERATION_REFUSAL);
+      await saveChatMessage({ sessionId, role: "assistant", content: MODERATION_REFUSAL, metadata: { moderated: true } });
+      return res.json({ answer: MODERATION_REFUSAL });
+    }
+
+    // Daily spend circuit-breaker.
+    if (isOverDailyLimit()) {
+      await saveChatMessage({ sessionId, role: "assistant", content: HIGH_DEMAND_REPLY, metadata: { rate_limited: true } });
+      return res.json({ answer: HIGH_DEMAND_REPLY });
+    }
+
+    // Extract structured facts (LLM) in parallel with the order lookup, then
+    // merge them so the answer engine sees an enriched profile.
+    const [extractedFacts, orderContext] = await Promise.all([
+      extractCustomerFacts(trimmed).catch(() => ({})),
+      buildOrderContext({ message: trimmed, memory }).catch((error) => {
+        console.error("order lookup failed");
+        console.error(error);
+        return "Order lookup status: lookup_error\nSay you could not check the order just now and offer to connect the customer with Bio Lec Mobility.";
+      })
+    ]);
+    rememberFacts(sessionId, extractedFacts);
+    const enrichedMemory = getSessionMemory(sessionId);
     const result = config.answerEngine === "fast"
-      ? await answerFast({ message, currentUrl, currentTitle, memory, orderContext })
-      : await answerWithCodexFallback({ sessionId, message, currentUrl, currentTitle, memory, orderContext });
+      ? await answerFast({ message: trimmed, currentUrl, currentTitle, memory: enrichedMemory, orderContext })
+      : await answerWithCodexFallback({ sessionId, message: trimmed, currentUrl, currentTitle, memory: enrichedMemory, orderContext });
+    recordAnswer();
     rememberAssistantMessage(sessionId, result.answer);
+    await saveChatMessage({
+      sessionId,
+      role: "assistant",
+      content: result.answer,
+      metadata: {
+        answer_engine: config.answerEngine,
+        answer_engine_fallback: result.answer_engine_fallback || null
+      }
+    });
+
+    // Best-effort: snapshot the learned facts to the customer profile. Never let
+    // a storage hiccup break the reply that was already generated.
+    if (customerId) {
+      saveCustomerProfile({ customerId, profile: getSessionMemory(sessionId).facts }).catch((error) => {
+        console.error("profile save failed");
+        console.error(error);
+      });
+    }
+
+    // Nudge the widget to surface the "Talk to a team member" option when the
+    // customer seems to want a person.
+    if (detectHandoffIntent(trimmed)) {
+      result.offer_handoff = true;
+    }
     return res.json(result);
   } catch (error) {
     next(error);
