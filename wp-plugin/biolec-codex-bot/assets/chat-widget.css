@@ -964,6 +964,19 @@
     bottom: 16px;
   }
 
+  /* The wrapper has `contain: layout`, which makes it the containing block for
+     the panel's `position: fixed`. So when the chat opens we expand the wrapper
+     to fill the viewport; otherwise the full-screen panel would be offset to the
+     launcher's corner and render off-screen. */
+  .biolec-chat--open {
+    inset: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+  }
+
   /* Full-screen chat on phones. 100dvh tracks the visible viewport so the
      composer never hides behind the browser address bar. */
   .biolec-chat__panel {
