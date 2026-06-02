@@ -721,9 +721,9 @@
 .biolec-result strong {
   display: block;
   color: var(--blm-ink);
-  font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+  font-family: inherit;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
 }
 
