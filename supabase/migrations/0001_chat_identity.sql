@@ -8,19 +8,17 @@
 
 create extension if not exists pgcrypto;
 
--- 1. Customer identity table.
+-- 1. Customer identity table. The email column is unique (the server stores it
+-- lowercased), which matches the server's ON CONFLICT (email) upsert.
 create table if not exists chat_customers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  email text not null,
+  email text not null unique,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
   constraint chat_customers_email_format check (email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]{2,}$')
 );
-
-create unique index if not exists chat_customers_email_key
-  on chat_customers (lower(email));
 
 -- 2. Link chat_sessions to the customer.
 alter table chat_sessions

@@ -60,20 +60,18 @@ create table if not exists sync_events (
 
 -- Customer identity captured when the chat is started (name + email).
 -- This is the canonical store for the visitor's details; sessions link to it.
+-- The email is stored lowercased by the server, so a column-level unique gives
+-- one row per address and matches the server's ON CONFLICT (email) upsert.
 create table if not exists chat_customers (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  email text not null,
+  email text not null unique,
   profile jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   last_seen_at timestamptz not null default now(),
   constraint chat_customers_email_format check (email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]{2,}$')
 );
-
--- One row per email address; the email is stored lowercased by the server.
-create unique index if not exists chat_customers_email_key
-  on chat_customers (lower(email));
 
 create table if not exists chat_sessions (
   id text primary key,
