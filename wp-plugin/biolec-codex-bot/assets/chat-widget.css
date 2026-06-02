@@ -183,6 +183,7 @@
 }
 
 .biolec-chat__panel {
+  position: relative;
   width: min(440px, calc(100vw - 32px));
   height: min(720px, calc(100vh - 48px));
   border: 1px solid var(--blm-line);
@@ -196,6 +197,8 @@
 }
 
 .biolec-chat__header {
+  position: relative;
+  z-index: 2;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -320,56 +323,74 @@
   background: var(--blm-line);
 }
 
+/* Full-panel frosted-glass name/email screen. Sits over the (blurred)
+   conversation; the header stays above it (z-index) so close stays usable. */
 .biolec-chat__start {
-  flex: 1;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
-  min-height: 0;
   flex-direction: column;
-  gap: 12px;
-  padding: 20px 18px;
-  background: var(--blm-surface);
+  justify-content: center;
+  gap: 16px;
+  padding: 28px 24px;
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(31, 168, 90, 0.18), transparent 60%),
+    radial-gradient(120% 80% at 0% 100%, rgba(45, 110, 171, 0.14), transparent 60%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.62), rgba(230, 244, 236, 0.7));
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
 }
 
 .biolec-chat__start strong {
   color: var(--blm-ink);
-  font-size: 16px;
-  line-height: 1.25;
+  font-size: 20px;
+  line-height: 1.2;
 }
 
 .biolec-chat__start label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: var(--blm-ink-2);
-  font-size: 12px;
+  color: var(--blm-ink);
+  font-size: 13px;
   font-weight: 700;
 }
 
 .biolec-chat__start input {
   width: 100%;
-  min-height: 42px;
-  border: 1px solid var(--blm-line);
-  border-radius: 12px;
-  padding: 0 12px;
-  background: #fff;
+  min-height: 50px;
+  border: 1.5px solid rgba(20, 32, 26, 0.22);
+  border-radius: 14px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.95);
   color: var(--blm-ink);
   font: inherit;
+  font-size: 15px;
   outline: 0;
+  box-shadow: 0 2px 8px rgba(20, 32, 26, 0.06);
+}
+
+.biolec-chat__start input::placeholder {
+  color: var(--blm-ink-3);
 }
 
 .biolec-chat__start input:focus {
   border-color: var(--blm-green);
-  box-shadow: 0 0 0 3px rgba(31, 168, 90, 0.12);
+  box-shadow: 0 0 0 4px rgba(31, 168, 90, 0.2);
 }
 
 .biolec-chat__start button {
-  min-height: 42px;
+  min-height: 50px;
+  margin-top: 4px;
   border: 0;
   border-radius: 999px;
   background: var(--blm-green);
   color: #fff;
   cursor: pointer;
   font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 8px 20px rgba(20, 112, 61, 0.28);
 }
 
 .biolec-chat__start button:hover {
@@ -384,8 +405,8 @@
 .biolec-chat__start-intro {
   margin: 0;
   color: var(--blm-ink-2);
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 .biolec-chat__start-error {
