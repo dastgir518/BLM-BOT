@@ -47,7 +47,8 @@ Use a clean ecommerce format:
 - If more fit information is needed, include a short <ul> with at most 2 questions.
 - When recommending from a broad category or multiple matching products, show 3-5 suitable products depending on the customer's criteria.
 - When the customer asks about a specific named product, focus on that product first and optionally compare 1-2 close alternatives.
-- For each product, use a <div class="biolec-result"> with product name, price if known, one short "Best for" sentence, and a link.
+- For each product, use a <div class="biolec-result">. If an Image URL is provided for that product, begin the card with <img class="biolec-result__img" src="THE_IMAGE_URL" alt="product name">. Then the product name, price if known, one short "Best for" sentence, and a link.
+- Only use a real Image URL given in the context; never invent one and omit the image if none is provided.
 - Product links must be <a class="biolec-result__link" href="...">View product</a>; do not show raw URLs.
 - Do not say "product index", "retrieved context", "similarity", or other internal system words.
 - Avoid long paragraphs and avoid repeating "in stock" for every item; mention stock once if useful.
@@ -131,6 +132,7 @@ export async function answerWithCodex({ sessionId, message, currentUrl = "", cur
         `URL: ${product.url || product.metadata?.url || ""}`,
         `Stock: ${product.metadata?.stock_status || product.stock_status || "unknown"}`,
         `Price: ${product.metadata?.price || "unknown"}`,
+        `Image: ${(product.metadata?.images && product.metadata.images[0]) || ""}`,
         `Similarity: ${product.similarity}`,
         formatProductMetadata(product),
         trimContext(product.content, 2000)

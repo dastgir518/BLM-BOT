@@ -57,8 +57,8 @@
   function sanitizeAssistantHtml(html) {
     var template = document.createElement('template');
     template.innerHTML = html || '';
-    var allowedTags = ['DIV', 'P', 'STRONG', 'UL', 'LI', 'A'];
-    var allowedClasses = ['biolec-result', 'biolec-result__link'];
+    var allowedTags = ['DIV', 'P', 'STRONG', 'UL', 'LI', 'A', 'IMG'];
+    var allowedClasses = ['biolec-result', 'biolec-result__link', 'biolec-result__img', 'biolec-result__media', 'biolec-result__body'];
 
     Array.prototype.slice.call(template.content.querySelectorAll('*')).forEach(function (node) {
       if (allowedTags.indexOf(node.tagName) === -1) {
@@ -71,6 +71,17 @@
           if (!/^https?:\/\//i.test(attribute.value) && attribute.value.charAt(0) !== '/') {
             node.removeAttribute('href');
           }
+          return;
+        }
+
+        // Product image: only allow http(s)/relative src and a plain alt.
+        if (node.tagName === 'IMG' && attribute.name === 'src') {
+          if (!/^https?:\/\//i.test(attribute.value) && attribute.value.charAt(0) !== '/') {
+            node.remove();
+          }
+          return;
+        }
+        if (node.tagName === 'IMG' && attribute.name === 'alt') {
           return;
         }
 
@@ -92,6 +103,11 @@
       if (node.tagName === 'A') {
         node.setAttribute('target', '_blank');
         node.setAttribute('rel', 'noopener');
+      }
+
+      if (node.tagName === 'IMG') {
+        node.setAttribute('loading', 'lazy');
+        if (!node.getAttribute('alt')) node.setAttribute('alt', '');
       }
     });
 
@@ -160,7 +176,6 @@
     var messages = scope.querySelector('.biolec-chat__messages');
     var form = scope.querySelector('.biolec-chat__form');
     var input = scope.querySelector('.biolec-chat__input');
-    var quick = scope.querySelector('.biolec-chat__quick');
     var prompts = scope.querySelector('.biolec-chat__prompts');
     var honeypot = scope.querySelector('.biolec-chat__hp');
     var handoffForm = scope.querySelector('.biolec-chat__handoff-form');
@@ -187,7 +202,6 @@
       if (start) start.hidden = true;
       messages.hidden = false;
       form.hidden = false;
-      if (quick) quick.hidden = false;
       if (prompts) prompts.hidden = false;
       messages.innerHTML = '';
       var welcome = welcomeHtml === undefined ? window.BiolecCodexBot.welcome : welcomeHtml;
@@ -350,16 +364,6 @@
       }
     });
 
-    if (quick) {
-      quick.addEventListener('click', function (event) {
-        var button = event.target.closest('[data-prompt]');
-        if (!button) return;
-        input.value = button.dataset.prompt || '';
-        resizeInput();
-        form.requestSubmit();
-      });
-    }
-
     if (prompts) {
       prompts.addEventListener('click', function (event) {
         var button = event.target.closest('[data-prompt]');
@@ -380,12 +384,28 @@
       sendMessage(text, { skipEcho: false });
     });
 
+    function addTypingMessage() {
+      var message = document.createElement('div');
+      message.className = 'biolec-chat__message biolec-chat__message--bot';
+      var bubble = document.createElement('div');
+      bubble.className = 'biolec-chat__bubble';
+      var typing = document.createElement('div');
+      typing.className = 'biolec-chat__typing';
+      typing.setAttribute('aria-label', 'Mobi is typing');
+      typing.innerHTML = '<span></span><span></span><span></span>';
+      bubble.appendChild(typing);
+      message.appendChild(bubble);
+      messages.appendChild(message);
+      messages.scrollTop = messages.scrollHeight;
+      return message;
+    }
+
     async function sendMessage(text, options) {
       var skipEcho = options && options.skipEcho;
       var profile = getProfile() || {};
       if (prompts) prompts.hidden = true;
       if (!skipEcho) addMessage(messages, 'user', text);
-      var pending = addMessage(messages, 'bot', '<p>One moment...</p>');
+      var pending = addTypingMessage();
 
       try {
         var response = await fetch(window.BiolecCodexBot.chatUrl, {

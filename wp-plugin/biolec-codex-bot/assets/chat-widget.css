@@ -971,3 +971,54 @@
     font-size: 16px;
   }
 }
+
+/* --- UI polish: product image, typing indicator, callback phone ----------- */
+
+.biolec-result__img {
+  width: 100%;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  background: var(--blm-surface-2);
+}
+
+.biolec-chat__typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px 2px;
+}
+
+.biolec-chat__typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blm-ink-3);
+  animation: biolec-typing 1.2s infinite ease-in-out both;
+}
+
+.biolec-chat__typing span:nth-child(2) { animation-delay: 0.15s; }
+.biolec-chat__typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes biolec-typing {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.biolec-chat__foot-contact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.biolec-chat__call {
+  color: var(--blm-green-deep);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.biolec-chat__call:hover {
+  text-decoration: underline;
+}

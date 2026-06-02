@@ -105,6 +105,12 @@ class Biolec_Codex_Bot_Admin
             },
             'default' => ''
         ]);
+
+        register_setting(BIOLEC_CODEX_BOT_OPTION_GROUP, 'biolec_codex_bot_support_phone', [
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => ''
+        ]);
     }
 
     public static function render_page()
@@ -164,6 +170,12 @@ class Biolec_Codex_Bot_Admin
                             <span>Support team email</span>
                             <input type="text" name="biolec_codex_bot_support_email" value="<?php echo esc_attr(get_option('biolec_codex_bot_support_email')); ?>" placeholder="<?php echo esc_attr(get_option('admin_email')); ?>">
                             <small>Where chat handoff requests are emailed. Separate multiple addresses with commas. Defaults to the site admin email.</small>
+                        </label>
+
+                        <label class="biolec-bot-field">
+                            <span>Support phone number</span>
+                            <input type="text" name="biolec_codex_bot_support_phone" value="<?php echo esc_attr(get_option('biolec_codex_bot_support_phone')); ?>" placeholder="e.g. 0800 123 4567">
+                            <small>Shown in the chat next to "Talk to a team member" so customers can call. Leave blank to hide.</small>
                         </label>
 
                         <div class="biolec-bot-actions">

@@ -141,12 +141,6 @@ class Biolec_Codex_Bot_Widget
                         <i aria-hidden="true">→</i>
                     </button>
                 </div>
-                <div class="biolec-chat__quick">
-                    <button type="button" data-prompt="I need help choosing a mobility scooter">Mobility scooter</button>
-                    <button type="button" data-prompt="Show me folding wheelchairs">Folding wheelchairs</button>
-                    <button type="button" data-prompt="How does delivery work?">Delivery</button>
-                    <button type="button" data-prompt="How do I claim VAT relief?">VAT relief</button>
-                </div>
                 <form class="biolec-chat__handoff-form" hidden>
                     <strong>Talk to a team member</strong>
                     <p class="biolec-chat__handoff-intro">Leave your details and our team will get back to you by email or phone.</p>
@@ -188,7 +182,13 @@ class Biolec_Codex_Bot_Widget
                         </button>
                     </div>
                     <div class="biolec-chat__foot">
-                        <button type="button" class="biolec-chat__handoff-open">Talk to a team member</button>
+                        <span class="biolec-chat__foot-contact">
+                            <button type="button" class="biolec-chat__handoff-open">Talk to a team member</button>
+                            <?php $biolec_phone = (string) get_option('biolec_codex_bot_support_phone'); ?>
+                            <?php if ($biolec_phone !== '') : ?>
+                                <a class="biolec-chat__call" href="tel:<?php echo esc_attr(preg_replace('/[^0-9+]/', '', $biolec_phone)); ?>">or call <?php echo esc_html($biolec_phone); ?></a>
+                            <?php endif; ?>
+                        </span>
                         <span>Press Enter</span>
                     </div>
                 </form>
