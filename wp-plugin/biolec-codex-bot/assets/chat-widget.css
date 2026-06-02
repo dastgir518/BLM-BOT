@@ -724,9 +724,9 @@
 
 .biolec-chat__quick {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 0 16px 8px;
-  overflow-x: auto;
   flex-shrink: 0;
 }
 
