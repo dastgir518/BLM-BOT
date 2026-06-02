@@ -1014,8 +1014,25 @@
     min-height: 40px;
   }
 
+  /* Icon-only accessibility button on phones so the header never crowds. */
+  .biolec-chat__a11y-toggle {
+    padding: 8px;
+  }
+
+  .biolec-chat__a11y-toggle span {
+    display: none;
+  }
+
   .biolec-chat__message {
     max-width: 90%;
+    font-size: 16px;
+  }
+
+  /* 16px inputs prevent iOS Safari from zooming the page on focus. */
+  .biolec-chat__input,
+  .biolec-chat__start input,
+  .biolec-chat__handoff-form input,
+  .biolec-chat__handoff-form textarea {
     font-size: 16px;
   }
 }
