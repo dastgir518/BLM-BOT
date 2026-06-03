@@ -26,16 +26,28 @@ export async function extractCustomerFacts(message) {
   if (!text) return {};
 
   try {
-    const response = await openai.chat.completions.create({
+    // Reasoning models (gpt-5*, o-series) reject `max_tokens` and a custom
+    // `temperature`; they need `max_completion_tokens` and a larger budget
+    // (reasoning tokens count toward completion). Older models keep the
+    // cheaper, deterministic settings.
+    const isReasoningModel = /^(gpt-5|o\d)/i.test(config.factModel);
+    const requestParams = {
       model: config.factModel,
-      temperature: 0,
-      max_tokens: 300,
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: text.slice(0, MAX_INPUT_LENGTH) }
       ]
-    });
+    };
+    if (isReasoningModel) {
+      requestParams.max_completion_tokens = 2000;
+      requestParams.reasoning_effort = "low";
+    } else {
+      requestParams.max_tokens = 300;
+      requestParams.temperature = 0;
+    }
+
+    const response = await openai.chat.completions.create(requestParams);
 
     const raw = response.choices?.[0]?.message?.content || "{}";
     const parsed = JSON.parse(raw);
