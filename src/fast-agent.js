@@ -9,7 +9,7 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "", 
   const startedAt = Date.now();
   const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle, memory });
   const [rawProducts, pages, viewedProduct] = await Promise.all([
-    semanticProductSearch({ query: retrievalQuery, matchCount: 12 }).catch(() => []),
+    semanticProductSearch({ query: retrievalQuery, matchCount: config.fastProductMatchCount }).catch(() => []),
     semanticPageSearch({ query: retrievalQuery, matchCount: 3 }).catch(() => []),
     currentUrl ? getProductByUrl(currentUrl).catch(() => null) : Promise.resolve(null)
   ]);

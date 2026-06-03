@@ -28,6 +28,9 @@ export const config = {
   codexPath: process.env.CODEX_PATH || "",
   answerEngine: process.env.ANSWER_ENGINE || "codex",
   fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-5",
+  // How many products to retrieve per turn for the fast engine. Fewer = faster
+  // replies + lower token cost; more = broader recall. 8 is a good balance.
+  fastProductMatchCount: Number(process.env.FAST_PRODUCT_MATCH_COUNT || 8),
   factModel: process.env.FACT_MODEL || process.env.FAST_ANSWER_MODEL || "gpt-4.1-mini",
   factExtractionEnabled: (process.env.FACT_EXTRACTION_ENABLED || "true").toLowerCase() !== "false",
   freeMessageLimit: Number(process.env.FREE_MESSAGE_LIMIT || 3),
