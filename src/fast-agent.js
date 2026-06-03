@@ -33,10 +33,13 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "", 
     ].join("\n"))
   ].join("\n\n---\n\n");
 
-  const response = await openai.responses.create({
+  // GPT-5 / o-series are reasoning models: they reject `temperature` and need a
+  // larger token budget (reasoning tokens count toward the output). Standard
+  // models (gpt-4.1, gpt-4o) take temperature and a smaller cap.
+  const isReasoningModel = /^(gpt-5|o\d)/i.test(config.fastAnswerModel);
+  const requestParams = {
     model: config.fastAnswerModel,
-    temperature: 0.4,
-    max_output_tokens: 800,
+    max_output_tokens: isReasoningModel ? 2500 : 800,
     input: [
       {
         role: "system",
@@ -56,7 +59,15 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "", 
         ].join("\n\n")
       }
     ]
-  });
+  };
+
+  if (isReasoningModel) {
+    requestParams.reasoning = { effort: "low" };
+  } else {
+    requestParams.temperature = 0.4;
+  }
+
+  const response = await openai.responses.create(requestParams);
 
   console.log(`chat.fastTotal ${Date.now() - startedAt}ms`);
 

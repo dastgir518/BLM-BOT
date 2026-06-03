@@ -27,7 +27,7 @@ export const config = {
   codexModel: process.env.CODEX_MODEL || "gpt-5.3-codex",
   codexPath: process.env.CODEX_PATH || "",
   answerEngine: process.env.ANSWER_ENGINE || "codex",
-  fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-4.1-mini",
+  fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-5",
   factModel: process.env.FACT_MODEL || process.env.FAST_ANSWER_MODEL || "gpt-4.1-mini",
   factExtractionEnabled: (process.env.FACT_EXTRACTION_ENABLED || "true").toLowerCase() !== "false",
   freeMessageLimit: Number(process.env.FREE_MESSAGE_LIMIT || 3),

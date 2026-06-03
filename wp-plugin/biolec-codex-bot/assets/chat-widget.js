@@ -134,6 +134,10 @@
     var bubble = document.createElement('div');
     bubble.className = 'biolec-chat__bubble';
     bubble.innerHTML = sanitizeAssistantHtml(html);
+    // Hide any product image that fails to load so it doesn't show a broken icon.
+    Array.prototype.slice.call(bubble.querySelectorAll('img')).forEach(function (img) {
+      img.addEventListener('error', function () { img.style.display = 'none'; });
+    });
     message.appendChild(bubble);
 
     if (window.speechSynthesis) {
