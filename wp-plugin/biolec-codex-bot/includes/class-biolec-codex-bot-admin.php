@@ -21,8 +21,8 @@ class Biolec_Codex_Bot_Admin
     public static function add_menu()
     {
         add_menu_page(
-            'Bio Lec AI Bot',
-            'Bio Lec AI Bot',
+            'Mobi Bio-Lec BOT',
+            'Mobi Bio-Lec BOT',
             'manage_options',
             'biolec-codex-bot',
             [__CLASS__, 'render_page'],
