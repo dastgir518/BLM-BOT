@@ -31,6 +31,9 @@ export const config = {
   // How many products to retrieve per turn for the fast engine. Fewer = faster
   // replies + lower token cost; more = broader recall. 8 is a good balance.
   fastProductMatchCount: Number(process.env.FAST_PRODUCT_MATCH_COUNT || 8),
+  // Self-service order tracking page. Mobi appends the order number to this
+  // base, so customers track orders there instead of Mobi calling WooCommerce.
+  orderTrackingUrl: process.env.ORDER_TRACKING_URL || "https://biolecmobility.com/track-order/",
   factModel: process.env.FACT_MODEL || process.env.FAST_ANSWER_MODEL || "gpt-4.1-mini",
   factExtractionEnabled: (process.env.FACT_EXTRACTION_ENABLED || "true").toLowerCase() !== "false",
   freeMessageLimit: Number(process.env.FREE_MESSAGE_LIMIT || 3),
