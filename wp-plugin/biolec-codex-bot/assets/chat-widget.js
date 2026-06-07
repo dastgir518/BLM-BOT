@@ -145,7 +145,7 @@
       speak.type = 'button';
       speak.className = 'biolec-chat__speak';
       speak.setAttribute('aria-label', 'Read this message aloud');
-      speak.textContent = '🔊';
+      speak.textContent = '▶️';
       message.appendChild(speak);
     }
   }
@@ -156,8 +156,8 @@
 
   function setSpeakBtnState(btn, speaking) {
     if (!btn) return;
-    btn.textContent = speaking ? '⏹️' : '🔊';
-    btn.setAttribute('aria-label', speaking ? 'Stop reading' : 'Read this message aloud');
+    btn.textContent = speaking ? '⏸️' : '▶️';
+    btn.setAttribute('aria-label', speaking ? 'Pause reading' : 'Read this message aloud');
     btn.classList.toggle('is-speaking', !!speaking);
   }
 
@@ -179,17 +179,17 @@
     window.speechSynthesis.speak(utterance);
   }
 
-  // Click handler for a speak button: start reading, or stop if it's already
-  // the one playing (toggle), instead of restarting from the beginning.
+  // Click handler for a speak button: play, pause, or resume the SAME message
+  // instead of restarting from the beginning.
   function toggleSpeak(btn) {
     if (!btn) return;
+    var synth = window.speechSynthesis;
+    if (!synth) return;
     var bubble = btn.parentNode.querySelector('.biolec-chat__bubble');
     if (!bubble) return;
-    if (activeSpeakBtn === btn && window.speechSynthesis && window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
-      activeSpeakBtn = null;
-      setSpeakBtnState(btn, false);
-      return;
+    if (activeSpeakBtn === btn) {
+      if (synth.paused) { synth.resume(); setSpeakBtnState(btn, true); return; }
+      if (synth.speaking) { synth.pause(); setSpeakBtnState(btn, false); return; }
     }
     speakText(bubble.textContent, btn);
   }
