@@ -1,6 +1,10 @@
 import { config } from "./config.js";
 
-const ORDER_QUERY_PATTERN = /\b(order|delivery|deliver|tracking|track|shipment|shipped|dispatch|where is|status)\b/i;
+// Only treat as an ORDER-STATUS query when the customer clearly refers to an
+// EXISTING order (an order number, or possessive/tracking phrasing). General,
+// pre-sale questions like "how long does delivery take" or "when can I expect
+// delivery if I order today" must NOT trigger an order lookup.
+const EXISTING_ORDER_PATTERN = /\b(my (order|delivery|parcel|package|item)|order (number|no\.?|status|#)|where('?s| is) my|track(ing)?|dispatch(ed)?|shipped|hasn'?t (arrived|come|shipped)|not (yet )?(arrived|received|delivered|come)|status of (my|the) order|chase (my|an?) order)\b/i;
 
 export async function buildOrderContext({ message, memory }) {
   if (!isOrderQuery(message, memory)) return "";
@@ -51,7 +55,9 @@ export function isOrderQuery(message, memory = null) {
     message,
     ...(memory?.messages || []).slice(-2).map((item) => item.content)
   ].join(" ");
-  return ORDER_QUERY_PATTERN.test(text);
+  // An explicit order id, or clear existing-order phrasing. A bare mention of
+  // "delivery" or "order" (as in a pre-sale question) does not qualify.
+  return extractOrderId(text) !== "" || EXISTING_ORDER_PATTERN.test(text);
 }
 
 function extractEmail(value = "") {
