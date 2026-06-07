@@ -255,9 +255,12 @@ app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
       return res.json({ require_email: true });
     }
 
-    // Cheap duplicate guard: do not re-bill OpenAI for an identical resend.
-    const lastCustomer = [...priorMemory.messages].reverse().find((item) => item.role === "customer");
-    if (lastCustomer && lastCustomer.content.trim() === trimmed) {
+    // Cheap duplicate guard: only catch a genuine UNANSWERED resend (e.g. a
+    // double-click) where the very last stored message is the same customer
+    // text with no assistant reply after it. Re-asking a question that was
+    // already answered is legitimate and must be answered again.
+    const lastMessage = priorMemory.messages[priorMemory.messages.length - 1];
+    if (lastMessage && lastMessage.role === "customer" && lastMessage.content.trim() === trimmed) {
       return res.json({ answer: DUPLICATE_REPLY });
     }
 
