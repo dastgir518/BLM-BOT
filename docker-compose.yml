@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   biolec-codex-bot:
     container_name: biolec-codex-bot
