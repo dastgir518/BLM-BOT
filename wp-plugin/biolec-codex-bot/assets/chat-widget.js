@@ -150,14 +150,48 @@
     }
   }
 
-  function speakText(text) {
+  // Tracks which speak button is currently reading, so the same button can
+  // toggle stop, and its icon reflects the playing/stopped state.
+  var activeSpeakBtn = null;
+
+  function setSpeakBtnState(btn, speaking) {
+    if (!btn) return;
+    btn.textContent = speaking ? '⏹️' : '🔊';
+    btn.setAttribute('aria-label', speaking ? 'Stop reading' : 'Read this message aloud');
+    btn.classList.toggle('is-speaking', !!speaking);
+  }
+
+  function speakText(text, btn) {
     if (!window.speechSynthesis) return;
     var clean = String(text || '').trim();
     if (!clean) return;
+    // Stop anything already playing and reset its button.
     window.speechSynthesis.cancel();
+    if (activeSpeakBtn && activeSpeakBtn !== btn) setSpeakBtnState(activeSpeakBtn, false);
     var utterance = new SpeechSynthesisUtterance(clean);
     utterance.lang = 'en-GB';
+    utterance.onend = utterance.onerror = function () {
+      if (activeSpeakBtn === btn) activeSpeakBtn = null;
+      setSpeakBtnState(btn, false);
+    };
+    activeSpeakBtn = btn || null;
+    setSpeakBtnState(btn, true);
     window.speechSynthesis.speak(utterance);
+  }
+
+  // Click handler for a speak button: start reading, or stop if it's already
+  // the one playing (toggle), instead of restarting from the beginning.
+  function toggleSpeak(btn) {
+    if (!btn) return;
+    var bubble = btn.parentNode.querySelector('.biolec-chat__bubble');
+    if (!bubble) return;
+    if (activeSpeakBtn === btn && window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      activeSpeakBtn = null;
+      setSpeakBtnState(btn, false);
+      return;
+    }
+    speakText(bubble.textContent, btn);
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -565,15 +599,15 @@
     function maybeAutoSpeak(messageEl) {
       if (!autoReadEnabled()) return;
       var bubble = messageEl.querySelector('.biolec-chat__bubble');
-      if (bubble) speakText(bubble.textContent);
+      var btn = messageEl.querySelector('.biolec-chat__speak');
+      if (bubble) speakText(bubble.textContent, btn);
     }
 
     // Delegated: read-aloud buttons on bot messages.
     scope.addEventListener('click', function (event) {
       var speakBtn = event.target.closest('.biolec-chat__speak');
       if (!speakBtn) return;
-      var bubble = speakBtn.parentNode.querySelector('.biolec-chat__bubble');
-      if (bubble) speakText(bubble.textContent);
+      toggleSpeak(speakBtn);
     });
 
     function applyAccessibilitySettings() {
