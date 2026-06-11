@@ -13,7 +13,8 @@ const EXISTING_ORDER_PATTERN = /\b(my (order|delivery|parcel|package|item)|order
 export async function buildOrderContext({ message, memory }) {
   if (!isOrderQuery(message, memory)) return "";
 
-  const base = config.orderTrackingUrl.replace(/\/?$/, "/");
+  // Append the order number to the exact prefix (which already ends with "?").
+  const base = config.orderTrackingUrl;
   const orderId = extractOrderId(message) || memory?.facts?.order_id || "";
 
   if (orderId) {
