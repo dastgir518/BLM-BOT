@@ -1,16 +1,21 @@
 .biolec-chat {
   --blm-green: #1fa85a;
   --blm-green-deep: #14703d;
-  --blm-green-soft: #e6f4ec;
-  --blm-bg: #fafaf7;
-  --blm-surface: #ffffff;
-  --blm-surface-2: #f4f2ec;
-  --blm-ink: #14201a;
-  --blm-ink-2: #4a5650;
-  --blm-ink-3: #7b847f;
-  --blm-line: #e4e1d7;
-  --blm-line-soft: #efede6;
-  --blm-shadow: 0 8px 24px rgba(20, 32, 26, 0.1), 0 32px 64px rgba(20, 112, 61, 0.18);
+  --blm-green-soft: #e9f5ed;
+  --blm-bg: #f8f1e8;
+  --blm-surface: #fffdf9;
+  --blm-surface-2: #f7efe3;
+  --blm-ink: #2a211a;
+  --blm-ink-2: #5c5249;
+  --blm-ink-3: #978a7c;
+  --blm-line: #ece2d4;
+  --blm-line-soft: #f4ecdf;
+  --blm-shadow: 0 6px 24px rgba(74, 52, 30, 0.10), 0 28px 70px rgba(31, 168, 90, 0.14);
+  /* Frosted-glass tokens: warm translucent fills + a soft blur. */
+  --blm-glass: rgba(255, 252, 246, 0.74);
+  --blm-glass-strong: rgba(255, 252, 246, 0.88);
+  --blm-glass-line: rgba(255, 255, 255, 0.55);
+  --blm-blur: blur(22px) saturate(135%);
   --blm-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   position: fixed;
   right: 24px;
@@ -186,9 +191,14 @@
   position: relative;
   width: min(440px, calc(100vw - 32px));
   height: min(720px, calc(100vh - 48px));
-  border: 1px solid var(--blm-line);
-  border-radius: 28px;
-  background: var(--blm-surface);
+  border: 1px solid var(--blm-glass-line);
+  border-radius: 32px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(31, 168, 90, 0.10), transparent 55%),
+    radial-gradient(120% 90% at 0% 100%, rgba(244, 196, 120, 0.16), transparent 55%),
+    var(--blm-glass);
+  backdrop-filter: var(--blm-blur);
+  -webkit-backdrop-filter: var(--blm-blur);
   box-shadow: var(--blm-shadow);
   overflow: hidden;
   display: flex;
@@ -204,9 +214,10 @@
   align-items: center;
   gap: 12px;
   padding: 16px 18px;
-  border-bottom: 1px solid var(--blm-line);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--blm-glass-line);
+  background: var(--blm-glass-strong);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
 }
 
 .biolec-chat__brand {
@@ -311,7 +322,7 @@
   padding: 20px 18px 12px;
   overflow-y: auto;
   overflow-x: hidden;
-  background: var(--blm-surface);
+  background: transparent;
 }
 
 .biolec-chat__messages::-webkit-scrollbar {
@@ -738,8 +749,8 @@
 
 .biolec-chat__message {
   max-width: 84%;
-  padding: 11px 15px;
-  border-radius: 16px;
+  padding: 12px 16px;
+  border-radius: 20px;
   font-size: 15px;
   line-height: 1.55;
   word-wrap: break-word;
@@ -748,17 +759,20 @@
 
 .biolec-chat__message--user {
   align-self: flex-end;
-  border-bottom-right-radius: 4px;
-  background: var(--blm-green);
+  border-bottom-right-radius: 6px;
+  background: linear-gradient(160deg, #29b765, var(--blm-green-deep));
   color: #fff;
+  box-shadow: 0 6px 18px rgba(20, 112, 61, 0.20);
   overflow-wrap: anywhere;
 }
 
 .biolec-chat__message--bot {
   align-self: flex-start;
   max-width: 100%;
-  border-bottom-left-radius: 4px;
-  background: var(--blm-surface-2);
+  border-bottom-left-radius: 6px;
+  background: rgba(255, 253, 248, 0.82);
+  border: 1px solid var(--blm-glass-line);
+  box-shadow: 0 4px 16px rgba(74, 52, 30, 0.07);
   color: var(--blm-ink);
 }
 
@@ -783,9 +797,10 @@
   gap: 5px;
   padding: 12px;
   margin: 8px 0;
-  border: 1px solid var(--blm-line);
-  border-radius: 14px;
-  background: #fff;
+  border: 1px solid var(--blm-glass-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 4px 14px rgba(74, 52, 30, 0.06);
 }
 
 .biolec-result strong {
@@ -916,8 +931,10 @@
 .biolec-chat__form {
   flex-shrink: 0;
   padding: 12px 16px 16px;
-  border-top: 1px solid var(--blm-line);
-  background: var(--blm-surface);
+  border-top: 1px solid var(--blm-glass-line);
+  background: var(--blm-glass-strong);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
 }
 
 .biolec-chat__composer {
@@ -925,9 +942,9 @@
   align-items: flex-end;
   gap: 8px;
   padding: 8px 8px 8px 14px;
-  border: 1px solid var(--blm-line);
-  border-radius: 20px;
-  background: #fff;
+  border: 1px solid var(--blm-glass-line);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.7);
   transition: border 160ms var(--blm-ease), box-shadow 160ms var(--blm-ease);
 }
 
