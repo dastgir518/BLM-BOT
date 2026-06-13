@@ -184,13 +184,62 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "", 
     toolRounds += 1;
   }
 
+  const answer = await fixCardImages(response.output_text, products);
+
   console.log(`chat.fastTotal ${Date.now() - startedAt}ms tools=${toolRounds}`);
 
   return {
-    answer: response.output_text,
+    answer,
     products,
     pages
   };
+}
+
+// Guarantee every product card shows the image that actually belongs to the
+// product its "View product" link points to. The model occasionally borrows a
+// different product's image; here we overwrite each card's <img> with the
+// canonical image for its linked URL (or drop the <img> if we have none).
+async function fixCardImages(html, products) {
+  const text = String(html || "");
+  if (!text.includes("biolec-result__img")) return text;
+
+  const imageByUrl = new Map();
+  for (const product of products || []) {
+    const url = product.url || product.metadata?.url || "";
+    const img = (product.metadata?.images && product.metadata.images[0]) || "";
+    if (url && img) imageByUrl.set(normalizeUrlKey(url), img);
+  }
+
+  const pattern = '<img\\b[^>]*class="biolec-result__img"[^>]*>([\\s\\S]*?)<a\\b[^>]*class="biolec-result__link"[^>]*href="([^"]+)"';
+
+  // Collect linked product URLs we don't already have an image for, and look
+  // them up (covers tool-fetched products not in the initial context).
+  const collector = new RegExp(pattern, "g");
+  const unknown = new Set();
+  let match;
+  while ((match = collector.exec(text)) !== null) {
+    const key = normalizeUrlKey(match[2]);
+    if (key && !imageByUrl.has(key)) unknown.add(match[2]);
+  }
+  for (const href of unknown) {
+    try {
+      const product = await getProductByUrl(href);
+      imageByUrl.set(normalizeUrlKey(href), product?.image || "");
+    } catch (_error) {
+      imageByUrl.set(normalizeUrlKey(href), "");
+    }
+  }
+
+  return text.replace(new RegExp(pattern, "g"), (full, between, href) => {
+    const img = imageByUrl.get(normalizeUrlKey(href)) || "";
+    const imgTag = img ? `<img class="biolec-result__img" src="${img}" alt="">` : "";
+    const withoutOriginalImg = full.replace(/^<img\b[^>]*>/, "");
+    return imgTag + withoutOriginalImg;
+  });
+}
+
+function normalizeUrlKey(url) {
+  return String(url || "").trim().toLowerCase().split(/[?#]/)[0].replace(/\/+$/, "");
 }
 
 async function runTool(name, args) {
