@@ -195,7 +195,7 @@ class Biolec_Codex_Bot_Widget
                     </div>
                     <div class="biolec-chat__foot">
                         <span class="biolec-chat__disclaimer">
-                            Mobi can make mistakes, so please double-check anything important. Need a person?
+                            Mobi can make mistakes.
                             <button type="button" class="biolec-chat__handoff-open">Open a support ticket</button>
                             <?php $biolec_phone = (string) get_option('biolec_codex_bot_support_phone'); ?>
                             <?php if ($biolec_phone !== '') : ?>
