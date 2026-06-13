@@ -206,7 +206,18 @@ function buildRetrievalQuery({ message, currentUrl, currentTitle, memory }) {
   const needFacts = ["condition", "mobility_needs", "use_area", "transport", "weight"]
     .map((key) => facts[key])
     .filter(Boolean);
-  return [...recent, ...needFacts, currentTitle, currentUrl].filter(Boolean).join("\n");
+  // For short/affirmative follow-ups ("yes", "yes please") the customer's words
+  // carry no product signal, so fold in the last assistant turn (e.g. an offer
+  // to compare with a cheaper model), stripped of HTML, so retrieval can surface
+  // the alternative product that was proposed instead of just the same one.
+  const lastAssistant = [...(memory?.messages || [])].reverse().find((item) => item.role === "assistant");
+  const isShortFollowUp = String(message).trim().split(/\s+/).length <= 4;
+  const assistantHint = isShortFollowUp && lastAssistant ? stripHtml(lastAssistant.content).slice(0, 400) : "";
+  return [...recent, assistantHint, ...needFacts, currentTitle, currentUrl].filter(Boolean).join("\n");
+}
+
+function stripHtml(value = "") {
+  return String(value).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function formatProductMetadata(product) {
