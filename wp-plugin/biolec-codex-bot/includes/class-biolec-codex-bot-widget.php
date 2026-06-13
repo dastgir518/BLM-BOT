@@ -86,12 +86,12 @@ class Biolec_Codex_Bot_Widget
                         </svg>
                         <span>Accessibility</span>
                     </button>
-                    <button class="biolec-chat__new" type="button" aria-label="Start new chat" title="New chat">
+                    <button class="biolec-chat__minimize" type="button" aria-label="Minimise chat (keeps your conversation)" title="Minimise">
                         <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                            <path d="M10 4v12M4 10h12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                            <path d="M5 13h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
                         </svg>
                     </button>
-                    <button class="biolec-chat__close" type="button" aria-label="Close chat">
+                    <button class="biolec-chat__close" type="button" aria-label="Close and clear chat" title="Close (clears the conversation)">
                         <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
                             <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
                         </svg>
@@ -154,8 +154,8 @@ class Biolec_Codex_Bot_Widget
                     </button>
                 </div>
                 <form class="biolec-chat__handoff-form" hidden>
-                    <strong>Talk to a team member</strong>
-                    <p class="biolec-chat__handoff-intro">Leave your details and our team will get back to you by email or phone.</p>
+                    <strong>Open a support ticket</strong>
+                    <p class="biolec-chat__handoff-intro">Leave your details and our team will reply by email. We do not have live chat, so this opens a ticket they will follow up.</p>
                     <label>
                         <span>Name</span>
                         <input class="biolec-chat__handoff-name" type="text" autocomplete="name" required>
@@ -194,14 +194,14 @@ class Biolec_Codex_Bot_Widget
                         </button>
                     </div>
                     <div class="biolec-chat__foot">
-                        <span class="biolec-chat__foot-contact">
-                            <button type="button" class="biolec-chat__handoff-open">Talk to a team member</button>
+                        <span class="biolec-chat__disclaimer">
+                            Mobi can make mistakes, so please double-check anything important. Need a person?
+                            <button type="button" class="biolec-chat__handoff-open">Open a support ticket</button>
                             <?php $biolec_phone = (string) get_option('biolec_codex_bot_support_phone'); ?>
                             <?php if ($biolec_phone !== '') : ?>
                                 <a class="biolec-chat__call" href="tel:<?php echo esc_attr(preg_replace('/[^0-9+]/', '', $biolec_phone)); ?>">or call <?php echo esc_html($biolec_phone); ?></a>
                             <?php endif; ?>
                         </span>
-                        <span>Press Enter</span>
                     </div>
                 </form>
             </div>

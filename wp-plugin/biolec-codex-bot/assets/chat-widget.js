@@ -145,7 +145,7 @@
       speak.type = 'button';
       speak.className = 'biolec-chat__speak';
       speak.setAttribute('aria-label', 'Read this message aloud');
-      speak.textContent = '▶️';
+      speak.textContent = '▶️ Listen';
       message.appendChild(speak);
     }
 
@@ -176,7 +176,7 @@
 
   function setSpeakBtnState(btn, speaking) {
     if (!btn) return;
-    btn.textContent = speaking ? '⏸️' : '▶️';
+    btn.textContent = speaking ? '⏸️ Pause' : '▶️ Listen';
     btn.setAttribute('aria-label', speaking ? 'Pause reading' : 'Read this message aloud');
     btn.classList.toggle('is-speaking', !!speaking);
   }
@@ -223,7 +223,7 @@
     var toggle = scope.querySelector('.biolec-chat__toggle');
     var panel = scope.querySelector('.biolec-chat__panel');
     var close = scope.querySelector('.biolec-chat__close');
-    var newChat = scope.querySelector('.biolec-chat__new');
+    var minimizeBtn = scope.querySelector('.biolec-chat__minimize');
     var start = scope.querySelector('.biolec-chat__start');
     var startName = scope.querySelector('.biolec-chat__start-name');
     var startEmail = scope.querySelector('.biolec-chat__start-email');
@@ -327,33 +327,28 @@
       }
     });
 
-    close.addEventListener('click', closePanel);
+    // Minimise: hide the panel but KEEP the conversation, identity and session
+    // so reopening shows exactly where the customer left off.
+    if (minimizeBtn) minimizeBtn.addEventListener('click', closePanel);
 
-    if (newChat) {
-      newChat.addEventListener('click', async function () {
-        if (!window.confirm('Start a new chat? This clears the current conversation.')) return;
-
-        var profile = getProfile();
-        newThread();
-        pendingMessage = null;
+    // Close: clear everything (conversation, identity and session) so the next
+    // time the chat is opened it starts fresh.
+    function clearChat() {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      resetSession();
+      pendingMessage = null;
+      if (handoffForm) handoffForm.hidden = true;
+      if (input) {
         input.value = '';
         resizeInput();
-
-        if (profile && profile.name && profile.email) {
-          // Keep the customer identified: open a fresh thread and greet them.
-          initializeChat('');
-          try {
-            var data = await registerSession(profile.name, profile.email);
-            addMessage(messages, 'bot', data.greeting || window.BiolecCodexBot.welcome);
-          } catch (_error) {
-            addMessage(messages, 'bot', window.BiolecCodexBot.welcome);
-          }
-        } else {
-          initializeChat();
-        }
-        input.focus();
-      });
+      }
+      initializeChat();
     }
+
+    close.addEventListener('click', function () {
+      clearChat();
+      closePanel();
+    });
 
     if (start) {
       start.addEventListener('submit', async function (event) {
@@ -524,7 +519,7 @@
       var button = document.createElement('button');
       button.type = 'button';
       button.className = 'biolec-chat__handoff-open';
-      button.textContent = 'Talk to a team member';
+      button.textContent = 'Open a support ticket';
       cta.appendChild(button);
       messages.appendChild(cta);
       messages.scrollTop = messages.scrollHeight;

@@ -269,7 +269,7 @@
   flex-shrink: 0;
 }
 
-.biolec-chat__new {
+.biolec-chat__minimize {
   width: 34px;
   height: 34px;
   border: 0;
@@ -282,12 +282,12 @@
   flex-shrink: 0;
 }
 
-.biolec-chat__new svg {
+.biolec-chat__minimize svg {
   width: 18px;
   height: 18px;
 }
 
-.biolec-chat__new:hover {
+.biolec-chat__minimize:hover {
   background: var(--blm-green);
   color: #fff;
 }
@@ -968,9 +968,6 @@
 }
 
 .biolec-chat__foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
   padding: 8px 4px 0;
   color: var(--blm-ink-3);
   font-size: 11px;
@@ -1060,7 +1057,7 @@
     height: 22px;
   }
 
-  .biolec-chat__new,
+  .biolec-chat__minimize,
   .biolec-chat__a11y-toggle {
     min-height: 40px;
   }
@@ -1121,11 +1118,13 @@
   40% { transform: scale(1); opacity: 1; }
 }
 
-.biolec-chat__foot-contact {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.biolec-chat__disclaimer {
+  line-height: 1.45;
+}
+
+.biolec-chat__disclaimer .biolec-chat__handoff-open,
+.biolec-chat__disclaimer .biolec-chat__call {
+  margin-left: 2px;
 }
 
 .biolec-chat__call {
