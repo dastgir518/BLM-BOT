@@ -145,7 +145,7 @@
       speak.type = 'button';
       speak.className = 'biolec-chat__speak';
       speak.setAttribute('aria-label', 'Read this message aloud');
-      speak.textContent = '▶️ Listen';
+      speak.textContent = '▶️ Read aloud';
       message.appendChild(speak);
     }
 
@@ -176,7 +176,7 @@
 
   function setSpeakBtnState(btn, speaking) {
     if (!btn) return;
-    btn.textContent = speaking ? '⏸️ Pause' : '▶️ Listen';
+    btn.textContent = speaking ? '⏸️ Pause' : '▶️ Read aloud';
     btn.setAttribute('aria-label', speaking ? 'Pause reading' : 'Read this message aloud');
     btn.classList.toggle('is-speaking', !!speaking);
   }
