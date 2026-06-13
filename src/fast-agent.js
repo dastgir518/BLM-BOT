@@ -5,6 +5,59 @@ import { instructions } from "./agent-prompt.js";
 
 const openai = new OpenAI({ apiKey: config.openaiApiKey });
 
+// Read-only tools the model can call to fetch catalogue data on demand, so it
+// can actually fulfil what it offers (e.g. find an alternative to compare, or
+// pull exact specs) instead of guessing or repeating the same product.
+const TOOLS = [
+  {
+    type: "function",
+    name: "search_products",
+    description:
+      "Search the Bio Lec Mobility catalogue. Use this to find an ALTERNATIVE product for a comparison, a cheaper or lighter option, or products in a category you do not already have in the provided context. Returns matching products with name, URL, price, stock, image, and a short spec summary.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "What to search for, e.g. 'folding commode chair under £70' or 'lightweight self-propelled wheelchair'."
+        },
+        max_results: {
+          type: "integer",
+          description: "How many products to return (1-8).",
+          minimum: 1,
+          maximum: 8
+        }
+      },
+      required: ["query"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "get_product_details",
+    description:
+      "Get the full specifications for one product by its URL. Use this when you need exact figures (dimensions, maximum user weight, seat width, range, etc.) for a product you are about to recommend or compare.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The product page URL." }
+      },
+      required: ["url"],
+      additionalProperties: false
+    }
+  }
+];
+
+const TOOL_GUIDANCE = `
+TOOLS (you can fetch live catalogue data yourself)
+- You have two tools: search_products (find products — e.g. an alternative for a comparison, or a cheaper/lighter option) and get_product_details (full specs for one product URL).
+- Always use the "Retrieved context" already provided first. Only call a tool when you need something that is NOT already there.
+- Crucially: if you offer or promise the customer something (a comparison, a cheaper or lighter option, specific specifications), CALL a tool to actually get it rather than guessing or repeating a product you already showed. If a tool returns nothing suitable, say so honestly and offer the team.
+- Keep tool use minimal (at most a couple of calls). Never mention the tools, searching, or "the system" to the customer.
+`;
+
+const MAX_TOOL_ROUNDS = 2;
+
 export async function answerFast({ message, currentUrl = "", currentTitle = "", memory = null, orderContext = "" }) {
   const startedAt = Date.now();
   const retrievalQuery = buildRetrievalQuery({ message, currentUrl, currentTitle, memory });
@@ -37,45 +90,103 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "", 
   // larger token budget (reasoning tokens count toward the output). Standard
   // models (gpt-4.1, gpt-4o) take temperature and a smaller cap.
   const isReasoningModel = /^(gpt-5|o\d)/i.test(config.fastAnswerModel);
-  const requestParams = {
-    model: config.fastAnswerModel,
-    max_output_tokens: isReasoningModel ? 2500 : 800,
-    input: [
-      {
-        role: "system",
-        content: instructions
-      },
-      {
-        role: "user",
-        content: [
-          currentUrl ? `Customer is currently viewing:\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
-          formatMemory(memory),
-          orderContext ? `WooCommerce order context:\n${orderContext}` : "",
-          viewedProduct && viewedProduct.specifications
-            ? `Specifications for the product the customer is viewing (${viewedProduct.title}):\n${trimContext(viewedProduct.specifications, 3000)}`
-            : "",
-          context ? `Retrieved context:\n${context}` : "No retrieved context was found.",
-          `Customer message:\n${message}`
-        ].join("\n\n")
-      }
-    ]
-  };
+  const maxOutputTokens = isReasoningModel ? 2500 : 800;
 
-  if (isReasoningModel) {
-    requestParams.reasoning = { effort: "low" };
-  } else {
-    requestParams.temperature = 0.4;
+  const input = [
+    { role: "system", content: instructions + TOOL_GUIDANCE },
+    {
+      role: "user",
+      content: [
+        currentUrl ? `Customer is currently viewing:\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
+        formatMemory(memory),
+        orderContext ? `WooCommerce order context:\n${orderContext}` : "",
+        viewedProduct && viewedProduct.specifications
+          ? `Specifications for the product the customer is viewing (${viewedProduct.title}):\n${trimContext(viewedProduct.specifications, 3000)}`
+          : "",
+        context ? `Retrieved context:\n${context}` : "No retrieved context was found.",
+        `Customer message:\n${message}`
+      ].join("\n\n")
+    }
+  ];
+
+  // Chain rounds with previous_response_id so reasoning state carries between
+  // tool calls (the robust pattern for reasoning models). store:true is what
+  // makes that chaining possible.
+  const baseParams = { model: config.fastAnswerModel, max_output_tokens: maxOutputTokens, tools: TOOLS, store: true };
+  if (isReasoningModel) baseParams.reasoning = { effort: "low" };
+  else baseParams.temperature = 0.4;
+
+  let response = await openai.responses.create({ ...baseParams, input });
+
+  let toolRounds = 0;
+  while (toolRounds < MAX_TOOL_ROUNDS) {
+    const calls = (response.output || []).filter((item) => item.type === "function_call");
+    if (!calls.length) break;
+
+    const toolOutputs = [];
+    for (const call of calls) {
+      const result = await runTool(call.name, safeJsonParse(call.arguments));
+      toolOutputs.push({ type: "function_call_output", call_id: call.call_id, output: JSON.stringify(result) });
+    }
+
+    response = await openai.responses.create({
+      ...baseParams,
+      previous_response_id: response.id,
+      input: toolOutputs
+    });
+    toolRounds += 1;
   }
 
-  const response = await openai.responses.create(requestParams);
-
-  console.log(`chat.fastTotal ${Date.now() - startedAt}ms`);
+  console.log(`chat.fastTotal ${Date.now() - startedAt}ms tools=${toolRounds}`);
 
   return {
     answer: response.output_text,
     products,
     pages
   };
+}
+
+async function runTool(name, args) {
+  try {
+    if (name === "search_products") {
+      const max = Math.min(Math.max(Number(args?.max_results) || 6, 1), 8);
+      const raw = await semanticProductSearch({ query: String(args?.query || "").trim(), matchCount: max });
+      const found = filterRelevantProducts(raw).slice(0, max).map(toToolProduct);
+      return found.length ? { products: found } : { products: [], note: "No matching products found." };
+    }
+    if (name === "get_product_details") {
+      const product = await getProductByUrl(String(args?.url || "").trim());
+      if (!product) return { found: false, note: "No product found for that URL." };
+      return {
+        found: true,
+        title: product.title,
+        url: product.url,
+        specifications: trimContext(product.specifications, 2500)
+      };
+    }
+    return { error: "unknown tool" };
+  } catch (_error) {
+    return { error: "tool lookup failed" };
+  }
+}
+
+function toToolProduct(product) {
+  return {
+    title: product.title,
+    url: product.url || product.metadata?.url || "",
+    price: product.price || product.metadata?.price || "unknown",
+    stock: product.stock_status || product.metadata?.stock_status || "unknown",
+    image: (product.metadata?.images && product.metadata.images[0]) || "",
+    specifications: trimContext(product.metadata?.specifications || "", 1200)
+  };
+}
+
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value || "{}");
+  } catch (_error) {
+    return {};
+  }
 }
 
 function trimContext(value, maxLength) {
