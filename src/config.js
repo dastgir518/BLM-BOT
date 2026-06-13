@@ -24,9 +24,6 @@ export const config = {
     consumerKey: required("WOOCOMMERCE_CONSUMER_KEY"),
     consumerSecret: required("WOOCOMMERCE_CONSUMER_SECRET")
   },
-  codexModel: process.env.CODEX_MODEL || "gpt-5.3-codex",
-  codexPath: process.env.CODEX_PATH || "",
-  answerEngine: process.env.ANSWER_ENGINE || "codex",
   fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-5",
   // How many products to retrieve per turn for the fast engine. Fewer = faster
   // replies + lower token cost; more = broader recall. 8 is a good balance.

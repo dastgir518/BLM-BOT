@@ -10,11 +10,6 @@ services:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=8787
-      # 'fast' uses the OpenAI API directly: cheaper, faster, and no Codex
-      # filesystem surface. Set to 'codex' to use the local Codex engine.
-      - ANSWER_ENGINE=fast
-    volumes:
-      - ./.codex-auth:/root/.codex
     expose:
       - "8787"
     networks:
