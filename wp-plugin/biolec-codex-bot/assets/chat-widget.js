@@ -129,7 +129,7 @@
 
   // Bot messages render into a content bubble with a sibling speak button, so
   // updating the text (renderBotMessage again) keeps the read-aloud control.
-  function renderBotMessage(message, html) {
+  function renderBotMessage(message, html, messageId) {
     message.innerHTML = '';
     var bubble = document.createElement('div');
     bubble.className = 'biolec-chat__bubble';
@@ -147,6 +147,26 @@
       speak.setAttribute('aria-label', 'Read this message aloud');
       speak.textContent = '▶️';
       message.appendChild(speak);
+    }
+
+    // Feedback buttons only on real answers (those the server gave an id for).
+    if (messageId !== undefined && messageId !== null && messageId !== '') {
+      var fb = document.createElement('div');
+      fb.className = 'biolec-chat__feedback';
+      fb.setAttribute('data-message-id', String(messageId));
+      var up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'biolec-chat__fb biolec-chat__fb--up';
+      up.setAttribute('aria-label', 'This answer was helpful');
+      up.textContent = '👍';
+      var down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'biolec-chat__fb biolec-chat__fb--down';
+      down.setAttribute('aria-label', 'This answer was not helpful');
+      down.textContent = '👎';
+      fb.appendChild(up);
+      fb.appendChild(down);
+      message.appendChild(fb);
     }
   }
 
@@ -475,7 +495,7 @@
           return;
         }
 
-        renderBotMessage(pending, data.answer || '<p>Sorry, I could not answer that just now.</p>');
+        renderBotMessage(pending, data.answer || '<p>Sorry, I could not answer that just now.</p>', data.message_id);
         maybeAutoSpeak(pending);
 
         // The server detected the customer may want a person; offer a handoff.
@@ -609,6 +629,33 @@
       if (!speakBtn) return;
       toggleSpeak(speakBtn);
     });
+
+    // Delegated: thumbs up/down feedback on bot answers.
+    scope.addEventListener('click', function (event) {
+      var fbBtn = event.target.closest('.biolec-chat__fb');
+      if (!fbBtn) return;
+      var wrap = fbBtn.closest('.biolec-chat__feedback');
+      if (!wrap || wrap.getAttribute('data-done') === '1') return;
+      var messageId = wrap.getAttribute('data-message-id');
+      var rating = fbBtn.classList.contains('biolec-chat__fb--up') ? 'up' : 'down';
+      sendFeedback(messageId, rating);
+      wrap.setAttribute('data-done', '1');
+      fbBtn.classList.add('is-selected');
+      var thanks = document.createElement('span');
+      thanks.className = 'biolec-chat__fb-thanks';
+      thanks.textContent = 'Thanks for the feedback';
+      wrap.appendChild(thanks);
+    });
+
+    function sendFeedback(messageId, rating) {
+      if (!window.BiolecCodexBot.feedbackUrl || !messageId) return;
+      // Fire-and-forget; feedback should never interrupt the chat.
+      fetch(window.BiolecCodexBot.feedbackUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: getSessionId(), message_id: messageId, rating: rating })
+      }).catch(function () {});
+    }
 
     function applyAccessibilitySettings() {
       var size = window.localStorage.getItem(A11Y_TEXTSIZE_KEY) || 'larger';

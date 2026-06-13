@@ -140,6 +140,27 @@ class Biolec_Codex_Bot_Rest
             ]
         ]);
 
+        register_rest_route('biolec-codex-bot/v1', '/feedback', [
+            'methods' => 'POST',
+            'callback' => [__CLASS__, 'feedback'],
+            'permission_callback' => '__return_true',
+            'args' => [
+                'session_id' => [
+                    'type' => 'string',
+                    'required' => true,
+                    'sanitize_callback' => 'sanitize_text_field'
+                ],
+                'message_id' => [
+                    'required' => true
+                ],
+                'rating' => [
+                    'type' => 'string',
+                    'required' => true,
+                    'sanitize_callback' => 'sanitize_text_field'
+                ]
+            ]
+        ]);
+
         register_rest_route('biolec-codex-bot/v1', '/admin/catalog-ids', [
             'methods' => 'GET',
             'callback' => [__CLASS__, 'catalog_ids'],
@@ -286,6 +307,29 @@ class Biolec_Codex_Bot_Rest
             'customer_email' => $request->get_param('customer_email'),
             'hp_field' => $request->get_param('hp_field')
         ]);
+    }
+
+    public static function feedback(WP_REST_Request $request)
+    {
+        $rating = (string) $request->get_param('rating');
+        if (!in_array($rating, ['up', 'down'], true)) {
+            return new WP_REST_Response(['error' => 'Invalid rating.'], 400);
+        }
+
+        return self::proxy_post('/chat/feedback', [
+            'session_id' => $request->get_param('session_id'),
+            'message_id' => $request->get_param('message_id'),
+            'rating' => $rating
+        ]);
+    }
+
+    // Fetch recent conversations from the bot server for the admin viewer.
+    // Returns the decoded array (e.g. ['messages' => [...]]) or an error array.
+    public static function recent_chats($limit = 120)
+    {
+        $response = self::proxy_post('/admin/recent-chats', ['limit' => (int) $limit]);
+        $data = $response->get_data();
+        return is_array($data) ? $data : [];
     }
 
     private static function client_ip()

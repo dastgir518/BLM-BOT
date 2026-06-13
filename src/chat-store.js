@@ -127,18 +127,61 @@ export async function upsertAnonymousSession({ sessionId, currentUrl, currentTit
 }
 
 export async function saveChatMessage({ sessionId, role, content, metadata = {} }) {
-  if (!sessionId || !role || !content) return;
+  if (!sessionId || !role || !content) return null;
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("chat_messages")
     .insert({
       session_id: sessionId,
       role,
       content,
       metadata
-    });
+    })
+    .select("id")
+    .single();
 
   if (error) throw error;
+  return data?.id ?? null;
+}
+
+// Record a thumbs up/down on one of Mobi's replies. Scoped to the session so a
+// visitor can only rate messages in their own conversation.
+export async function saveMessageFeedback({ messageId, sessionId, rating }) {
+  const id = Number(messageId);
+  if (!Number.isInteger(id) || !sessionId || !["up", "down"].includes(rating)) {
+    throw new Error("A valid message id, session, and rating are required");
+  }
+
+  const { error } = await supabase
+    .from("chat_messages")
+    .update({ feedback: rating })
+    .eq("id", id)
+    .eq("session_id", sessionId);
+
+  if (error) throw error;
+}
+
+// Read recent chat messages (newest first) with the customer they belong to,
+// for the admin "Recent chats" viewer. Service-role only.
+export async function getRecentChats({ limit = 120 } = {}) {
+  const capped = Math.min(Math.max(Number(limit) || 120, 1), 500);
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select("id, session_id, role, content, feedback, created_at, chat_sessions(chat_customers(name, email))")
+    .order("created_at", { ascending: false })
+    .limit(capped);
+
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    id: row.id,
+    session_id: row.session_id,
+    role: row.role,
+    content: String(row.content || "").slice(0, 4000),
+    feedback: row.feedback || null,
+    created_at: row.created_at,
+    customer_name: row.chat_sessions?.chat_customers?.name || null,
+    customer_email: row.chat_sessions?.chat_customers?.email || null
+  }));
 }
 
 const MAX_HANDOFF_TRANSCRIPT = 60;

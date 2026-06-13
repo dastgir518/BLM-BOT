@@ -627,6 +627,44 @@
   opacity: 1;
 }
 
+.biolec-chat__feedback {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.biolec-chat__fb {
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  border-radius: 6px;
+}
+
+.biolec-chat__fb:hover {
+  opacity: 1;
+}
+
+.biolec-chat__fb.is-selected {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.biolec-chat__feedback[data-done="1"] .biolec-chat__fb:not(.is-selected) {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.biolec-chat__fb-thanks {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
 .biolec-chat__mic {
   flex: 0 0 auto;
   width: 38px;

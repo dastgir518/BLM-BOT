@@ -90,6 +90,7 @@ create table if not exists chat_messages (
   session_id text references chat_sessions(id) on delete cascade,
   role text not null,
   content text not null,
+  feedback text check (feedback is null or feedback in ('up', 'down')),
   metadata jsonb default '{}'::jsonb,
   created_at timestamptz not null default now()
 );

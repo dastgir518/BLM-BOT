@@ -44,6 +44,7 @@ class Biolec_Codex_Bot_Widget
             'chatUrl' => esc_url_raw(rest_url('biolec-codex-bot/v1/chat')),
             'registerUrl' => esc_url_raw(rest_url('biolec-codex-bot/v1/register')),
             'handoffUrl' => esc_url_raw(rest_url('biolec-codex-bot/v1/handoff')),
+            'feedbackUrl' => esc_url_raw(rest_url('biolec-codex-bot/v1/feedback')),
             'styleUrl' => esc_url_raw(BIOLEC_CODEX_BOT_URL . 'assets/chat-widget.css'),
             'welcome' => '<p>Hi, I am Mobi. I can help you find products, understand delivery, or check order questions.</p>'
         ]);

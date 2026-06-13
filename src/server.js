@@ -5,7 +5,7 @@ import { verifyWordPressSignature } from "./security.js";
 import { upsertProduct, deleteProduct, clearProducts } from "./product-sync.js";
 import { upsertPage, deletePage, clearPages } from "./page-sync.js";
 import { answerFast } from "./fast-agent.js";
-import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff } from "./chat-store.js";
+import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff, saveMessageFeedback, getRecentChats } from "./chat-store.js";
 import { checkSupabase } from "./health.js";
 import { buildOrderContext } from "./order-lookup.js";
 import { getSessionMemory, rememberAssistantMessage, rememberCustomer, rememberUserMessage, rememberFacts, isProfileLoaded, markProfileLoaded } from "./session-memory.js";
@@ -314,12 +314,13 @@ app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
     const result = await answerFast({ message: trimmed, currentUrl, currentTitle, memory: enrichedMemory, orderContext });
     recordAnswer();
     rememberAssistantMessage(sessionId, result.answer);
-    await saveChatMessage({
+    const assistantMessageId = await saveChatMessage({
       sessionId,
       role: "assistant",
       content: result.answer,
       metadata: { answer_engine: "fast" }
     });
+    if (assistantMessageId != null) result.message_id = assistantMessageId;
 
     // Best-effort: snapshot the learned facts to the customer profile. Never let
     // a storage hiccup break the reply that was already generated.
@@ -336,6 +337,33 @@ app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
       result.offer_handoff = true;
     }
     return res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Record a thumbs up/down on one of Mobi's replies.
+app.post("/chat/feedback", chatSignature, rateLimit, async (req, res, next) => {
+  try {
+    const sessionId = String(req.body?.session_id || "").trim();
+    const messageId = req.body?.message_id;
+    const rating = String(req.body?.rating || "").trim();
+    if (!sessionId || messageId == null || !["up", "down"].includes(rating)) {
+      return res.status(400).json({ error: "session_id, message_id and a valid rating are required" });
+    }
+    await saveMessageFeedback({ messageId, sessionId, rating });
+    return res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Admin: recent conversations for the WordPress "Recent chats" viewer.
+app.post("/admin/recent-chats", verifyWordPressSignature, async (req, res, next) => {
+  try {
+    const limit = Number(req.body?.limit) || 120;
+    const messages = await getRecentChats({ limit });
+    return res.json({ messages });
   } catch (error) {
     next(error);
   }

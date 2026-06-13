@@ -38,6 +38,84 @@ class Biolec_Codex_Bot_Admin
             'biolec-codex-bot',
             [__CLASS__, 'render_page']
         );
+
+        add_submenu_page(
+            'biolec-codex-bot',
+            'Recent chats',
+            'Recent chats',
+            'manage_options',
+            'biolec-codex-bot-chats',
+            [__CLASS__, 'render_chats_page']
+        );
+    }
+
+    public static function render_chats_page()
+    {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $data = Biolec_Codex_Bot_Rest::recent_chats(200);
+        echo '<div class="wrap"><h1>Recent chats</h1>';
+
+        if (isset($data['error'])) {
+            echo '<div class="notice notice-error"><p>' . esc_html($data['error']) . '</p></div></div>';
+            return;
+        }
+
+        $messages = isset($data['messages']) && is_array($data['messages']) ? $data['messages'] : [];
+        if (empty($messages)) {
+            echo '<p>No conversations yet.</p></div>';
+            return;
+        }
+
+        // Group messages by session (server returns newest first; show oldest
+        // first within each conversation for readability).
+        $sessions = [];
+        foreach ($messages as $msg) {
+            $sid = isset($msg['session_id']) ? (string) $msg['session_id'] : 'unknown';
+            if (!isset($sessions[$sid])) {
+                $sessions[$sid] = [
+                    'customer' => $msg['customer_name'] ?: 'Anonymous',
+                    'email' => $msg['customer_email'] ?: '',
+                    'latest' => $msg['created_at'],
+                    'rows' => []
+                ];
+            }
+            $sessions[$sid]['rows'][] = $msg;
+        }
+
+        echo '<p style="color:#666">Showing the latest ' . count($messages) . ' messages across ' . count($sessions) . ' conversations. 👎 marks replies a customer rated unhelpful.</p>';
+
+        foreach ($sessions as $sid => $session) {
+            $title = esc_html($session['customer']);
+            if ($session['email']) {
+                $title .= ' &lt;' . esc_html($session['email']) . '&gt;';
+            }
+            echo '<div style="margin:16px 0;border:1px solid #ddd;border-radius:8px;overflow:hidden">';
+            echo '<div style="background:#f6f7f7;padding:8px 12px;font-weight:600">' . $title
+                . ' <span style="font-weight:400;color:#888">· ' . esc_html($session['latest']) . '</span></div>';
+            echo '<div style="padding:8px 12px">';
+
+            $rows = array_reverse($session['rows']);
+            foreach ($rows as $row) {
+                $role = ($row['role'] === 'assistant') ? 'Mobi' : 'Customer';
+                $isBot = ($row['role'] === 'assistant');
+                $content = $isBot ? wp_kses_post((string) $row['content']) : esc_html((string) $row['content']);
+                $fb = '';
+                if (!empty($row['feedback'])) {
+                    $fb = $row['feedback'] === 'up' ? ' 👍' : ' 👎';
+                }
+                $color = $isBot ? '#0a6' : '#333';
+                echo '<div style="margin:6px 0"><strong style="color:' . $color . '">' . esc_html($role) . ':</strong> '
+                    . '<span>' . $content . '</span>'
+                    . '<span style="font-size:13px">' . $fb . '</span></div>';
+            }
+
+            echo '</div></div>';
+        }
+
+        echo '</div>';
     }
 
     public static function enqueue($hook)
