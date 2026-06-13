@@ -144,13 +144,15 @@ export async function answerFast({ message, currentUrl = "", currentTitle = "", 
     {
       role: "user",
       content: [
-        currentUrl ? `Customer is currently viewing:\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
+        currentUrl ? `Web page the customer currently has open in their browser (this is just the page they are on — it is NOT necessarily what you have been discussing):\nTitle: ${currentTitle || "unknown"}\nURL: ${currentUrl}` : "",
         formatMemory(memory),
         orderContext ? `WooCommerce order context:\n${orderContext}` : "",
         viewedProduct && viewedProduct.specifications
-          ? `Specifications for the product the customer is viewing (${viewedProduct.title}):\n${trimContext(viewedProduct.specifications, 3000)}`
+          ? `Specifications for the product page the customer currently has open (${viewedProduct.title}):\n${trimContext(viewedProduct.specifications, 3000)}`
           : "",
-        context ? `Retrieved context:\n${context}` : "No retrieved context was found.",
+        context
+          ? `Catalogue SEARCH RESULTS for the current message (these were just fetched for THIS message — they are NOT a record of what you discussed earlier; do not claim you talked about a product just because it appears here):\n${context}`
+          : "No catalogue results were found for this message.",
         `Customer message:\n${message}`
       ].join("\n\n")
     }
@@ -405,14 +407,16 @@ function formatMemory(memory) {
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n");
   const messages = (memory.messages || [])
-    .slice(-6)
-    .map((item) => `${item.role}: ${trimContext(item.content, 350)}`)
+    .slice(-20)
+    .map((item) => `${item.role}: ${trimContext(item.content, 400)}`)
     .join("\n");
 
   return [
     `Customer turn count in this chat: ${turnCount}`,
     facts ? `Remembered customer details:\n${facts}` : "",
-    messages ? `Recent conversation:\n${messages}` : ""
+    messages
+      ? `Conversation so far (this is the ONLY record of what you and the customer have actually discussed — rely on it for any question about what was said or shown earlier):\n${messages}`
+      : ""
   ]
     .filter(Boolean)
     .join("\n\n");

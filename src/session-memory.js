@@ -1,4 +1,7 @@
-const MAX_MESSAGES = 8;
+// Keep a generous window so Mobi can follow a longer conversation (this is the
+// single biggest driver of "it forgot what we discussed"). Counts both sides,
+// so 40 ≈ 20 back-and-forth exchanges.
+const MAX_MESSAGES = 40;
 const MAX_FACTS = 20;
 const SESSION_TTL_MS = 60 * 60 * 1000;
 const sessions = new Map();
