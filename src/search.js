@@ -150,7 +150,7 @@ export async function getProductByUrl(url) {
 
   const { data, error } = await supabase
     .from("product_documents")
-    .select("title, url, content, metadata")
+    .select("title, url, price, stock_status, content, metadata")
     .ilike("url", `${escapeIlike(base)}%`)
     .limit(8);
 
@@ -159,9 +159,15 @@ export async function getProductByUrl(url) {
 
   const specChunk = data.find((row) => row.metadata?.chunk_kind === "specifications");
   const row = specChunk || data[0];
+  // Stock/price/shipping live at product level; pull from whichever chunk row
+  // carries them so a thin specifications chunk doesn't return blanks.
   return {
     title: row.title,
     url: row.url,
+    price: (data.find((r) => r.price)?.price) || row.metadata?.price || "",
+    stock_status: (data.find((r) => r.stock_status)?.stock_status) || row.metadata?.stock_status || "",
+    shipping_class: (data.find((r) => r.metadata?.shipping_class)?.metadata?.shipping_class) || "",
+    image: (data.find((r) => r.metadata?.images?.length)?.metadata?.images?.[0]) || "",
     specifications: row.metadata?.specifications || ""
   };
 }

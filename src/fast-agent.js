@@ -45,14 +45,61 @@ const TOOLS = [
       required: ["url"],
       additionalProperties: false
     }
+  },
+  {
+    type: "function",
+    name: "check_stock",
+    description:
+      "Check whether a specific product is in stock. Use when the customer asks if something is available. Give the product name or its URL.",
+    parameters: {
+      type: "object",
+      properties: {
+        product: { type: "string", description: "Product name or product page URL." }
+      },
+      required: ["product"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "get_delivery_for_product",
+    description:
+      "Get the delivery timing for one specific product by reading its shipping class. Use when the customer asks how soon a particular item will arrive. Give the product name or URL.",
+    parameters: {
+      type: "object",
+      properties: {
+        product: { type: "string", description: "Product name or product page URL." }
+      },
+      required: ["product"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "find_spare_part",
+    description:
+      "Search for a spare part, replacement, or accessory. Use when the customer needs a part for a product (e.g. a replacement wheel, brake, or basket). Describe the part and the product it is for.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "What part is needed and the product it is for." }
+      },
+      required: ["query"],
+      additionalProperties: false
+    }
   }
 ];
 
 const TOOL_GUIDANCE = `
 TOOLS (you can fetch live catalogue data yourself)
-- You have two tools: search_products (find products — e.g. an alternative for a comparison, or a cheaper/lighter option) and get_product_details (full specs for one product URL).
+- You have these tools:
+  - search_products: find products (e.g. an alternative for a comparison, or a cheaper/lighter option).
+  - get_product_details: full specifications for one product URL.
+  - check_stock: whether a specific product is in stock.
+  - get_delivery_for_product: the delivery timing for a specific product (from its shipping class).
+  - find_spare_part: find a spare part, replacement, or accessory.
 - Always use the "Retrieved context" already provided first. Only call a tool when you need something that is NOT already there.
-- Crucially: if you offer or promise the customer something (a comparison, a cheaper or lighter option, specific specifications), CALL a tool to actually get it rather than guessing or repeating a product you already showed. If a tool returns nothing suitable, say so honestly and offer the team.
+- Crucially: if you offer or promise the customer something (a comparison, a cheaper option, exact specs, a stock check, a delivery time, a spare part), CALL the matching tool to actually get it rather than guessing or repeating a product you already showed. If a tool returns nothing suitable, say so honestly and offer the team.
 - Keep tool use minimal (at most a couple of calls). Never mention the tools, searching, or "the system" to the customer.
 `;
 
@@ -164,10 +211,65 @@ async function runTool(name, args) {
         specifications: trimContext(product.specifications, 2500)
       };
     }
+    if (name === "check_stock") {
+      const product = await resolveProduct(String(args?.product || ""));
+      if (!product) return { found: false, note: "Couldn't find that product." };
+      return { found: true, title: product.title, url: product.url, stock_status: product.stock_status || "unknown" };
+    }
+    if (name === "get_delivery_for_product") {
+      const product = await resolveProduct(String(args?.product || ""));
+      if (!product) return { found: false, note: "Couldn't find that product." };
+      return {
+        found: true,
+        title: product.title,
+        url: product.url,
+        delivery: deliverySummary(product.shipping_class)
+      };
+    }
+    if (name === "find_spare_part") {
+      const query = `${String(args?.query || "").trim()} spare part replacement accessory`;
+      const raw = await semanticProductSearch({ query, matchCount: 6 });
+      const found = filterRelevantProducts(raw).slice(0, 6).map(toToolProduct);
+      return found.length
+        ? { products: found }
+        : { products: [], note: "No matching spare part or accessory found — offer to connect them with the team." };
+    }
     return { error: "unknown tool" };
   } catch (_error) {
     return { error: "tool lookup failed" };
   }
+}
+
+// Resolve a product from a name OR a URL to the fields the tools need.
+async function resolveProduct(input) {
+  const text = String(input || "").trim();
+  if (!text) return null;
+  if (/^https?:\/\//i.test(text)) {
+    const byUrl = await getProductByUrl(text);
+    if (byUrl) return byUrl;
+  }
+  const raw = await semanticProductSearch({ query: text, matchCount: 3 });
+  const top = filterRelevantProducts(raw)[0];
+  if (!top) return null;
+  return {
+    title: top.title,
+    url: top.url || top.metadata?.url || "",
+    price: top.price || top.metadata?.price || "",
+    stock_status: top.stock_status || top.metadata?.stock_status || "",
+    shipping_class: top.metadata?.shipping_class || ""
+  };
+}
+
+// Map a WooCommerce shipping-class slug to a plain-English delivery summary,
+// matching the DELIVERY POLICY rules in the prompt.
+function deliverySummary(shippingClass) {
+  const normalized = String(shippingClass || "").replace(/[-_]/g, " ").toLowerCase();
+  if (!normalized) return "Usually 3-7 working days (please confirm for this item).";
+  if (/next.?working.?day/.test(normalized)) {
+    return "Next-working-day available: order before 11am on a working day; orders placed after 11am are processed the next working day.";
+  }
+  if (/free/.test(normalized)) return "Free delivery, usually 3-7 working days.";
+  return "Usually 3-7 working days.";
 }
 
 function toToolProduct(product) {
