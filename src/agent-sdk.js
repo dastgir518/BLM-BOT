@@ -1,6 +1,6 @@
 import { Agent, run, tool, setDefaultOpenAIKey, setTracingDisabled, system, user, assistant } from "@openai/agents";
 import { config } from "./config.js";
-import { instructions } from "./agent-prompt.js";
+import { productInstructions, policyInstructions, trackingInstructions } from "./agent-prompt.js";
 import { semanticProductSearch, getProductByUrl, filterRelevantProducts } from "./search.js";
 
 // Configure the SDK once. Tracing is disabled so nothing is shipped to OpenAI's
@@ -175,8 +175,7 @@ const productAgent = new Agent({
   name: "Product adviser",
   model: config.fastAnswerModel,
   modelSettings,
-  instructions: `${instructions}
-
+  instructions: `${productInstructions}
 YOUR ROLE: You are the product adviser. Help the customer find, choose, compare, and understand products. Use your tools to fetch products, specs, stock, alternatives, and spare parts on demand. Do NOT search again just to answer a short follow-up to your own question — reply directly to what they said.`,
   tools: [searchProductsTool, getProductDetailsTool, checkStockTool, findSparePartTool]
 });
@@ -185,8 +184,7 @@ const policyAgent = new Agent({
   name: "Policy adviser",
   model: config.fastAnswerModel,
   modelSettings,
-  instructions: `${instructions}
-
+  instructions: `${policyInstructions}
 YOUR ROLE: You answer delivery, returns, VAT relief, and other general policy questions from the reliable facts above. For a SPECIFIC product's delivery timing, call get_delivery_for_product. Do not start recommending products unless the customer asks.`,
   tools: [getDeliveryForProductTool]
 });
@@ -195,8 +193,7 @@ const trackingAgent = new Agent({
   name: "Order tracking",
   model: config.fastAnswerModel,
   modelSettings,
-  instructions: `${instructions}
-
+  instructions: `${trackingInstructions}
 YOUR ROLE: Help the customer track an EXISTING order. Tracking is self-service: give them the tracking link from the order context (or ask for their order number, then give the link with it on the end). Never look up orders, never ask for a billing email, and never state an order's status yourself.`
 });
 
