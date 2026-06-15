@@ -5,6 +5,7 @@ import { verifyWordPressSignature } from "./security.js";
 import { upsertProduct, deleteProduct, clearProducts } from "./product-sync.js";
 import { upsertPage, deletePage, clearPages } from "./page-sync.js";
 import { answerFast } from "./fast-agent.js";
+import { answerWithSdk } from "./agent-sdk.js";
 import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff, saveMessageFeedback, getRecentChats } from "./chat-store.js";
 import { checkSupabase } from "./health.js";
 import { buildOrderContext } from "./order-lookup.js";
@@ -48,7 +49,7 @@ app.get("/health/supabase", async (_req, res, next) => {
 app.get("/health/chat", async (_req, res) => {
   res.json({
     ok: true,
-    answerEngine: "fast",
+    answerEngine: config.answerEngine,
     embeddingModel: config.embeddingModel,
     fastAnswerModel: config.fastAnswerModel
   });
@@ -311,14 +312,15 @@ app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
     ]);
     rememberFacts(sessionId, extractedFacts);
     const enrichedMemory = getSessionMemory(sessionId);
-    const result = await answerFast({ message: trimmed, currentUrl, currentTitle, memory: enrichedMemory, orderContext });
+    const engine = config.answerEngine === "sdk" ? answerWithSdk : answerFast;
+    const result = await engine({ message: trimmed, currentUrl, currentTitle, memory: enrichedMemory, orderContext });
     recordAnswer();
     rememberAssistantMessage(sessionId, result.answer);
     const assistantMessageId = await saveChatMessage({
       sessionId,
       role: "assistant",
       content: result.answer,
-      metadata: { answer_engine: "fast" }
+      metadata: { answer_engine: config.answerEngine }
     });
     if (assistantMessageId != null) result.message_id = assistantMessageId;
 

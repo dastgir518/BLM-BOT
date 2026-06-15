@@ -24,6 +24,9 @@ export const config = {
     consumerKey: required("WOOCOMMERCE_CONSUMER_KEY"),
     consumerSecret: required("WOOCOMMERCE_CONSUMER_SECRET")
   },
+  // "fast" = direct Responses API engine (fast-agent.js).
+  // "sdk"  = OpenAI Agents SDK engine (agent-sdk.js): triage + specialist agents.
+  answerEngine: (process.env.ANSWER_ENGINE || "fast").toLowerCase(),
   fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-5",
   // How many products to retrieve per turn for the fast engine. Fewer = faster
   // replies + lower token cost; more = broader recall. 8 is a good balance.
