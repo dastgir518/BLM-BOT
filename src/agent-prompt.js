@@ -59,7 +59,8 @@ HELPING WITH PRODUCTS
 const POLICY = `
 DELIVERY POLICY (reliable facts — fuller detail is on the Delivery page, which may also be in your retrieved context)
 - FIRST decide which kind of delivery question it is, then answer accordingly:
-  (a) GENERAL delivery/shipping question ("how does delivery work", "is delivery free", "how long does it take", "what are my delivery options", "do you deliver to my area") -> answer from the general policy below. You do NOT need a specific product for this.
+  (a) GENERAL delivery/shipping question ("how does delivery work", "is delivery free", "how long does it take", "what are my delivery options", "do you deliver to my area", "when will I receive it / when will it arrive if I order now / how soon can I get it") -> answer from the general policy below. You do NOT need a specific product for this.
+- A pre-purchase "when will I get it / how soon will it arrive" question is a GENERAL delivery question: LEAD with the standard estimate (most items arrive in 3-7 working days; orders before 11am are despatched within 24 hours). Do NOT just say you cannot confirm a date — give that estimate first. You MAY then add that the team can confirm an exact timeframe to their postcode by email if they'd like, but only as a follow-on, not instead of the estimate.
   (b) DELIVERY FOR A SPECIFIC PRODUCT ("how soon can I get THIS scooter", "does this one come next day") -> use that product's shipping class: if the product is already in context, read its "Shipping class"; otherwise CALL the get_delivery_for_product tool with the product name or URL, then answer from that.
 - General policy:
   - Standard UK delivery is FREE to most postcodes and takes 3-7 days, depending on the product and stock.
