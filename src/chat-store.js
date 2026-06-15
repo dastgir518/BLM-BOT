@@ -161,6 +161,30 @@ export async function saveMessageFeedback({ messageId, sessionId, rating }) {
   if (error) throw error;
 }
 
+// Load a single session's conversation (oldest first) so the server can rebuild
+// its in-memory context after a restart, idle-expiry, or in a new browser tab.
+// Returns [{ role: "customer" | "assistant", content }]; assistant HTML stripped.
+export async function getSessionHistory(sessionId, limit = 40) {
+  if (!sessionId) return [];
+  const capped = Math.min(Math.max(Number(limit) || 40, 1), 200);
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select("role, content, created_at")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(capped);
+
+  if (error) throw error;
+  return (data || [])
+    .reverse()
+    .map((row) => ({
+      role: row.role === "assistant" ? "assistant" : "customer",
+      content: row.role === "assistant"
+        ? String(row.content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+        : String(row.content || "")
+    }));
+}
+
 // Read recent chat messages (newest first) with the customer they belong to,
 // for the admin "Recent chats" viewer. Service-role only.
 export async function getRecentChats({ limit = 120 } = {}) {

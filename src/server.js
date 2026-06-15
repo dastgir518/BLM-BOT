@@ -6,10 +6,10 @@ import { upsertProduct, deleteProduct, clearProducts } from "./product-sync.js";
 import { upsertPage, deletePage, clearPages } from "./page-sync.js";
 import { answerFast } from "./fast-agent.js";
 import { answerWithSdk } from "./agent-sdk.js";
-import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff, saveMessageFeedback, getRecentChats } from "./chat-store.js";
+import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff, saveMessageFeedback, getRecentChats, getSessionHistory } from "./chat-store.js";
 import { checkSupabase } from "./health.js";
 import { buildOrderContext } from "./order-lookup.js";
-import { getSessionMemory, rememberAssistantMessage, rememberCustomer, rememberUserMessage, rememberFacts, isProfileLoaded, markProfileLoaded } from "./session-memory.js";
+import { getSessionMemory, rememberAssistantMessage, rememberCustomer, rememberUserMessage, rememberFacts, isProfileLoaded, markProfileLoaded, hasMessages, isHydrated, seedMessages } from "./session-memory.js";
 import { extractCustomerFacts } from "./fact-extraction.js";
 import { rateLimit } from "./rate-limit.js";
 import { isOverDailyLimit, recordAnswer } from "./usage-guard.js";
@@ -276,6 +276,13 @@ app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
       }
     } else {
       await upsertAnonymousSession({ sessionId, currentUrl, currentTitle });
+    }
+
+    // Rebuild context from the database if this process has none for the session
+    // (a restart, idle-expiry, or a new browser tab) so Mobi never "forgets".
+    if (!isHydrated(sessionId) && !hasMessages(sessionId)) {
+      const history = await getSessionHistory(sessionId, 40).catch(() => []);
+      seedMessages(sessionId, history);
     }
 
     rememberUserMessage(sessionId, trimmed);

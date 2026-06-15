@@ -43,6 +43,29 @@ export function rememberAssistantMessage(sessionId, answer) {
   session.messages = session.messages.slice(-MAX_MESSAGES);
 }
 
+// Whether this process already has any conversation in memory for the session.
+export function hasMessages(sessionId) {
+  return (getSession(sessionId).messages || []).length > 0;
+}
+
+// Whether we've already tried to rebuild this session from the database, so we
+// only read it once per process-session.
+export function isHydrated(sessionId) {
+  return Boolean(getSession(sessionId).hydrated);
+}
+
+// Seed a session's conversation from persisted history (DB) when this process
+// has none — e.g. after a restart, the idle-expiry, or in a new browser tab.
+// Never clobbers a live in-memory conversation.
+export function seedMessages(sessionId, messages = []) {
+  const session = getSession(sessionId);
+  session.hydrated = true;
+  if (!Array.isArray(messages) || !messages.length) return;
+  if ((session.messages || []).length) return;
+  session.messages = messages.slice(-MAX_MESSAGES);
+  session.customerTurns = messages.filter((item) => item.role === "customer").length;
+}
+
 // Tracks whether a returning customer's saved profile has been loaded into this
 // session yet, so we only read it from the database once per session.
 export function isProfileLoaded(sessionId) {
