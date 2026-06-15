@@ -8,10 +8,15 @@ import { semanticProductSearch, getProductByUrl, filterRelevantProducts } from "
 setDefaultOpenAIKey(config.openaiApiKey);
 setTracingDisabled(true);
 
-const isReasoningModel = /^(gpt-5|o\d)/i.test(config.fastAnswerModel);
-const modelSettings = isReasoningModel
-  ? { reasoning: { effort: "low" }, maxTokens: 2500 }
-  : { temperature: 0.4, maxTokens: 800 };
+function settingsForModel(model) {
+  return /^(gpt-5|o\d)/i.test(model)
+    ? { reasoning: { effort: "low" }, maxTokens: 2500 }
+    : { temperature: 0.4, maxTokens: 800 };
+}
+
+// Specialists answer with the main model; triage routes on the cheap model.
+const modelSettings = settingsForModel(config.fastAnswerModel);
+const triageSettings = settingsForModel(config.triageModel);
 
 // ---------------------------------------------------------------------------
 // Tools (read-only). Retrieval now happens ON DEMAND when an agent calls these,
@@ -197,8 +202,8 @@ YOUR ROLE: Help the customer track an EXISTING order. Tracking is self-service: 
 
 const triageAgent = Agent.create({
   name: "Mobi",
-  model: config.fastAnswerModel,
-  modelSettings,
+  model: config.triageModel,
+  modelSettings: triageSettings,
   instructions: `You are Mobi, Bio Lec Mobility's friendly assistant. Read the latest customer message in the context of the conversation and route it to the right specialist by handing off:
 - Anything about products — choosing, comparing, specs, stock, spare parts, "show me…", or a short reply continuing a product chat — hand off to the Product adviser.
 - Delivery, returns, VAT relief, or other general policy questions — hand off to the Policy adviser.

@@ -28,6 +28,10 @@ export const config = {
   // "sdk"  = OpenAI Agents SDK engine (agent-sdk.js): triage + specialist agents.
   answerEngine: (process.env.ANSWER_ENGINE || "fast").toLowerCase(),
   fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-5",
+  // SDK engine only: routing is trivial classification, so keep the triage
+  // agent on a small fast model to avoid doubling cost. The specialists use
+  // FAST_ANSWER_MODEL for the actual reply.
+  triageModel: process.env.TRIAGE_MODEL || "gpt-4o-mini",
   // How many products to retrieve per turn for the fast engine. Fewer = faster
   // replies + lower token cost; more = broader recall. 8 is a good balance.
   fastProductMatchCount: Number(process.env.FAST_PRODUCT_MATCH_COUNT || 8),
