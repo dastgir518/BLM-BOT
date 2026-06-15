@@ -229,6 +229,8 @@ class Biolec_Codex_Bot_Sync
                 'height' => $product->get_height()
             ],
             'shipping_class' => $product->get_shipping_class(),
+            'shipping_classes' => self::shipping_class_names($product),
+            'next_day_delivery' => self::is_next_day_delivery($product),
             'average_rating' => $product->get_average_rating(),
             'review_count' => $product->get_review_count(),
             'purchase_note' => $product->get_purchase_note(),
@@ -244,6 +246,34 @@ class Biolec_Codex_Bot_Sync
             'raw_meta' => self::raw_post_meta($product->get_id()),
             'updated_at' => gmdate('c', get_post_modified_time('U', true, $product->get_id()))
         ];
+    }
+
+    // All shipping-class term names assigned to the product. Standard WooCommerce
+    // allows one, but the store uses a multi-checkbox setup, so read the whole
+    // product_shipping_class taxonomy rather than the single get_shipping_class().
+    private static function shipping_class_names($product)
+    {
+        $names = wp_get_post_terms($product->get_id(), 'product_shipping_class', ['fields' => 'names']);
+        if (is_wp_error($names) || empty($names)) {
+            return [];
+        }
+        return array_values($names);
+    }
+
+    // True when the product is flagged for next-working-day delivery. Otherwise
+    // standard 3-7 working day delivery applies.
+    private static function is_next_day_delivery($product)
+    {
+        foreach (self::shipping_class_names($product) as $name) {
+            if (stripos((string) $name, 'next working day') !== false) {
+                return true;
+            }
+        }
+        // Fallback for a standard single shipping class slug.
+        if (stripos((string) $product->get_shipping_class(), 'next-working-day') !== false) {
+            return true;
+        }
+        return false;
     }
 
     private static function product_taxonomies($product_id)

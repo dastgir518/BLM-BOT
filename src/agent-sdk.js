@@ -33,6 +33,7 @@ function toToolProduct(product) {
     url: product.url || product.metadata?.url || "",
     price: product.price || product.metadata?.price || "unknown",
     stock: product.stock_status || product.metadata?.stock_status || "unknown",
+    delivery: product.metadata?.next_day_delivery === true ? "next working day available (before 11am)" : "standard 3-7 working days",
     image: (product.metadata?.images && product.metadata.images[0]) || "",
     specifications: trimText(product.metadata?.specifications || "", 1200)
   };
@@ -54,18 +55,18 @@ async function resolveProduct(input) {
     price: top.price || top.metadata?.price || "",
     stock_status: top.stock_status || top.metadata?.stock_status || "",
     shipping_class: top.metadata?.shipping_class || "",
+    next_day_delivery: top.metadata?.next_day_delivery === true,
     image: (top.metadata?.images && top.metadata.images[0]) || ""
   };
 }
 
-function deliverySummary(shippingClass) {
-  const c = String(shippingClass || "").replace(/[-_]/g, " ").toLowerCase();
-  if (!c) return "Usually 3-7 working days (please confirm for this item).";
-  if (/next.?working.?day/.test(c)) {
-    return "Next-working-day available: order before 11am on a working day; after 11am is processed the next working day.";
+// Delivery timing from the synced next-day flag (set in WooCommerce via the
+// "Next working day Delivery" shipping class); otherwise standard 3-7 days.
+function deliverySummary(product) {
+  if (product && product.next_day_delivery) {
+    return "Next-working-day delivery available: order before 11am on a working day; after 11am is processed the next working day.";
   }
-  if (/free/.test(c)) return "Free delivery, usually 3-7 working days.";
-  return "Usually 3-7 working days.";
+  return "Standard delivery, usually 3-7 working days.";
 }
 
 const searchProductsTool = tool({
@@ -142,8 +143,8 @@ const getDeliveryForProductTool = tool({
       found: true,
       title: found.title,
       url: found.url,
-      shipping_class: found.shipping_class || "",
-      delivery: deliverySummary(found.shipping_class)
+      next_day_delivery: found.next_day_delivery === true,
+      delivery: deliverySummary(found)
     });
   }
 });

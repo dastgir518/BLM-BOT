@@ -329,6 +329,7 @@ function toToolProduct(product) {
     url: product.url || product.metadata?.url || "",
     price: product.price || product.metadata?.price || "unknown",
     stock: product.stock_status || product.metadata?.stock_status || "unknown",
+    delivery: product.metadata?.next_day_delivery === true ? "next working day available (before 11am)" : "standard 3-7 working days",
     image: (product.metadata?.images && product.metadata.images[0]) || "",
     specifications: trimContext(product.metadata?.specifications || "", 1200)
   };

@@ -167,6 +167,7 @@ export async function getProductByUrl(url) {
     price: (data.find((r) => r.price)?.price) || row.metadata?.price || "",
     stock_status: (data.find((r) => r.stock_status)?.stock_status) || row.metadata?.stock_status || "",
     shipping_class: (data.find((r) => r.metadata?.shipping_class)?.metadata?.shipping_class) || "",
+    next_day_delivery: data.some((r) => r.metadata?.next_day_delivery === true),
     image: (data.find((r) => r.metadata?.images?.length)?.metadata?.images?.[0]) || "",
     specifications: row.metadata?.specifications || ""
   };
