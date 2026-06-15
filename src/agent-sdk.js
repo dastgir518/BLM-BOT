@@ -216,9 +216,47 @@ export async function answerWithSdk({ message, currentUrl = "", currentTitle = "
   const startedAt = Date.now();
   const items = buildInputItems({ currentUrl, currentTitle, memory, orderContext, message });
   const result = await run(triageAgent, items, { maxTurns: 8 });
-  const answer = await fixCardImages(String(result.finalOutput || ""));
-  console.log(`chat.sdkTotal ${Date.now() - startedAt}ms agent=${result.lastAgent?.name || "?"}`);
+
+  let raw = String(result.finalOutput || "");
+  let guardrail = "ok";
+
+  // Output guardrail: Mobi must never claim to do things it cannot (email a
+  // link, add to basket, set up checkout, place an order). If the draft makes
+  // such a claim, re-run once with an explicit reminder; if it still slips,
+  // append an honest clarification so the customer is never misled.
+  if (violatesCapabilities(raw)) {
+    guardrail = "retried";
+    const corrected = await run(triageAgent, [...items, system(CAPABILITY_REMINDER)], { maxTurns: 8 }).catch(() => null);
+    const retryText = corrected ? String(corrected.finalOutput || "") : "";
+    if (retryText && !violatesCapabilities(retryText)) {
+      raw = retryText;
+    } else {
+      guardrail = "appended";
+      raw = `${retryText || raw}\n<p>Just so you know, I can't email links, add items to your basket, or check out for you — please use the "View product" link to choose your options and check out there.</p>`;
+    }
+  }
+
+  const answer = await fixCardImages(raw);
+  console.log(`chat.sdkTotal ${Date.now() - startedAt}ms agent=${result.lastAgent?.name || "?"} guardrail=${guardrail}`);
   return { answer, products: [], pages: [] };
+}
+
+// Flags a reply that claims an action Mobi cannot perform. Kept high-precision
+// so it doesn't trip on legitimate text (e.g. "our team will email you", a
+// tracking link, or "head to checkout").
+const CAPABILITY_REMINDER =
+  "REMINDER: You cannot email anything to the customer, add items to a basket, create checkout/payment links, or place orders. Do not claim or offer to do any of those. Point the customer to the View product page to choose options and check out themselves.";
+
+function violatesCapabilities(text) {
+  const t = String(text || "");
+  const patterns = [
+    /\b(added|adding|popped|put)\b[^.?!\n]*\b(basket|cart)\b/i,
+    /\bin your (basket|cart)\b/i,
+    /\bi['’\s]*(?:ve|have|ll|will|'ll|m)?\s*(?:just\s+)?(?:e-?mail(?:ed|ing)?|sent)\b[^.?!\n]*\b(?:link|it|this|details)\b/i,
+    /\bcheckout link\b/i,
+    /\bi['’\s]*(?:ve|have)\s*(?:just\s+)?(?:placed|set up|processed|created)\b[^.?!\n]*\b(order|checkout)\b/i
+  ];
+  return patterns.some((re) => re.test(t));
 }
 
 function buildInputItems({ currentUrl, currentTitle, memory, orderContext, message }) {
