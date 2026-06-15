@@ -19,11 +19,6 @@ export const config = {
   supabaseUrl: required("SUPABASE_URL"),
   supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
   syncSecret: required("BIOLEC_SYNC_SECRET"),
-  woocommerce: {
-    url: required("WOOCOMMERCE_URL"),
-    consumerKey: required("WOOCOMMERCE_CONSUMER_KEY"),
-    consumerSecret: required("WOOCOMMERCE_CONSUMER_SECRET")
-  },
   // "fast" = direct Responses API engine (fast-agent.js).
   // "sdk"  = OpenAI Agents SDK engine (agent-sdk.js): triage + specialist agents.
   answerEngine: (process.env.ANSWER_ENGINE || "fast").toLowerCase(),

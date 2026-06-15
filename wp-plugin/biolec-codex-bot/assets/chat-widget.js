@@ -23,14 +23,6 @@
     return created;
   }
 
-  // Start a fresh conversation thread but KEEP the stored profile, so a known
-  // customer stays identified across "New chat" (no re-gate, no re-asking).
-  function newThread() {
-    var created = 'session_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    window.localStorage.setItem(SESSION_KEY, created);
-    window.localStorage.setItem(SESSION_CREATED_KEY, String(Date.now()));
-    return created;
-  }
 
   function getProfile() {
     var createdAt = Number(window.localStorage.getItem(SESSION_CREATED_KEY) || 0);
