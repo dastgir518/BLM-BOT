@@ -248,24 +248,43 @@ class Biolec_Codex_Bot_Sync
         ];
     }
 
-    // All shipping-class term names assigned to the product. Standard WooCommerce
-    // allows one, but the store uses a multi-checkbox setup, so read the whole
-    // product_shipping_class taxonomy rather than the single get_shipping_class().
+    // Resolve the product's shipping-class terms. The store's custom shipping
+    // plugin stores multiple selected classes as an array of TERM IDS in the
+    // `_multiple_shipping_classes` post meta (not the standard single field).
+    private static function shipping_class_terms($product)
+    {
+        $terms = [];
+        $class_ids = get_post_meta($product->get_id(), '_multiple_shipping_classes', true);
+        if (is_array($class_ids)) {
+            foreach ($class_ids as $class_id) {
+                $term = get_term((int) $class_id, 'product_shipping_class');
+                if ($term && !is_wp_error($term)) {
+                    $terms[] = $term;
+                }
+            }
+        }
+        return $terms;
+    }
+
+    // Shipping-class names for context (e.g. "Next working day Delivery", "Free Shipping").
     private static function shipping_class_names($product)
     {
-        $names = wp_get_post_terms($product->get_id(), 'product_shipping_class', ['fields' => 'names']);
-        if (is_wp_error($names) || empty($names)) {
-            return [];
+        $names = [];
+        foreach (self::shipping_class_terms($product) as $term) {
+            $names[] = $term->name;
+        }
+        if (empty($names) && $product->get_shipping_class()) {
+            $names[] = $product->get_shipping_class();
         }
         return array_values($names);
     }
 
-    // True when the product is flagged for next-working-day delivery. Otherwise
-    // standard 3-7 working day delivery applies.
+    // True when the product is flagged for next-working-day delivery — matches
+    // the store plugin's own check (next-working-day-delivery slugs).
     private static function is_next_day_delivery($product)
     {
-        foreach (self::shipping_class_names($product) as $name) {
-            if (stripos((string) $name, 'next working day') !== false) {
+        foreach (self::shipping_class_terms($product) as $term) {
+            if ($term->slug === 'next-working-day-delivery' || $term->slug === 'next-working-day-delivery-small-parcel') {
                 return true;
             }
         }

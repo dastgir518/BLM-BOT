@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Mobi Bio-Lec BOT
  * Description: Mobi, the Bio Lec Mobility AI assistant — chat widget plus WooCommerce product sync to the Supabase vector index.
- * Version: 0.4.7
+ * Version: 0.4.8
  * Author: Bio Lec Mobility
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('BIOLEC_CODEX_BOT_VERSION', '0.4.7');
+define('BIOLEC_CODEX_BOT_VERSION', '0.4.8');
 define('BIOLEC_CODEX_BOT_OPTION_GROUP', 'biolec_codex_bot_options');
 define('BIOLEC_CODEX_BOT_URL', plugin_dir_url(__FILE__));
 
