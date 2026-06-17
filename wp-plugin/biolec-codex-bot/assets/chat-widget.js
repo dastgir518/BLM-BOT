@@ -163,8 +163,12 @@
   }
 
   // Tracks which speak button is currently reading, so the same button can
-  // toggle stop, and its icon reflects the playing/stopped state.
+  // toggle pause/resume, and its icon reflects the playing/paused state. We keep
+  // our OWN paused flag because Chrome/Edge report speechSynthesis.paused and
+  // .speaking unreliably (after pause() they often still say speaking=true,
+  // paused=false), which broke resume.
   var activeSpeakBtn = null;
+  var speakPaused = false;
 
   function setSpeakBtnState(btn, speaking) {
     if (!btn) return;
@@ -183,16 +187,17 @@
     var utterance = new SpeechSynthesisUtterance(clean);
     utterance.lang = 'en-GB';
     utterance.onend = utterance.onerror = function () {
-      if (activeSpeakBtn === btn) activeSpeakBtn = null;
+      if (activeSpeakBtn === btn) { activeSpeakBtn = null; speakPaused = false; }
       setSpeakBtnState(btn, false);
     };
     activeSpeakBtn = btn || null;
+    speakPaused = false;
     setSpeakBtnState(btn, true);
     window.speechSynthesis.speak(utterance);
   }
 
-  // Click handler for a speak button: play, pause, or resume the SAME message
-  // instead of restarting from the beginning.
+  // Click handler for a speak button: play, then pause/resume the SAME message
+  // (using our own paused flag, not the unreliable browser getters).
   function toggleSpeak(btn) {
     if (!btn) return;
     var synth = window.speechSynthesis;
@@ -200,8 +205,16 @@
     var bubble = btn.parentNode.querySelector('.biolec-chat__bubble');
     if (!bubble) return;
     if (activeSpeakBtn === btn) {
-      if (synth.paused) { synth.resume(); setSpeakBtnState(btn, true); return; }
-      if (synth.speaking) { synth.pause(); setSpeakBtnState(btn, false); return; }
+      if (speakPaused) {
+        synth.resume();
+        speakPaused = false;
+        setSpeakBtnState(btn, true);
+      } else {
+        synth.pause();
+        speakPaused = true;
+        setSpeakBtnState(btn, false);
+      }
+      return;
     }
     speakText(bubble.textContent, btn);
   }
