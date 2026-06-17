@@ -306,7 +306,7 @@ export async function answerWithSdk({ message, currentUrl = "", currentTitle = "
     }
   }
 
-  const answer = await fixCardImages(raw);
+  const answer = normalizeOutboundLinks(await fixCardImages(raw));
   console.log(`chat.sdkTotal ${Date.now() - startedAt}ms agent=${result.lastAgent?.name || "?"} guardrail=${guardrail} handoff=${handoff.requested}`);
   const out = { answer, products: [], pages: [] };
   if (handoff.requested) out.handoff = { reason: handoff.reason };
@@ -410,4 +410,18 @@ async function fixCardImages(html) {
 
 function normalizeUrlKey(url) {
   return String(url || "").trim().toLowerCase().split(/[?#]/)[0].replace(/\/+$/, "");
+}
+
+// The widget renders HTML, not Markdown, so a Markdown link the model sometimes
+// emits ("[text](url)") shows as dead text. And the model occasionally rewrites
+// the track-order URL and drops the "?" before the order number. Fix both
+// deterministically so links are always clickable and correct.
+function normalizeOutboundLinks(html) {
+  return String(html || "")
+    // Markdown [text](url) -> clickable <a>. Runs first so the URL fix below
+    // also reaches links that were written in Markdown.
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>')
+    // The order number must sit after "?" on the track-order page, however the
+    // model formatted it (e.g. ".../track-order/39895" -> ".../track-order/?39895").
+    .replace(/track-order\/?\??(\d{3,})/gi, "track-order/?$1");
 }
