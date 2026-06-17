@@ -15,7 +15,7 @@ function settingsForModel(model) {
 }
 
 // Specialists answer with the main model; triage routes on the cheap model.
-const modelSettings = settingsForModel(config.fastAnswerModel);
+const modelSettings = settingsForModel(config.answerModel);
 const triageSettings = settingsForModel(config.triageModel);
 
 // ---------------------------------------------------------------------------
@@ -168,34 +168,98 @@ const findSparePartTool = tool({
   }
 });
 
+// Connect the customer with the human team. Mobi calls this itself instead of
+// asking the customer to fill in a form; the widget then sends their on-file
+// details + this conversation through the existing handoff path (team email +
+// audit row). We record the request on the run context so the entry point can
+// signal the widget and the guardrail knows a "passed to the team" claim is now
+// truthful.
+const escalateToSupportTool = tool({
+  name: "escalate_to_support",
+  description:
+    "Connect the customer with the Bio Lec team by email. Use ONLY when truly needed: the customer asks for a person; it is a complaint, refund, return, cancellation, damaged/faulty item, or an account/payment problem; a safety or medical-suitability concern; or you genuinely cannot answer their request. Sends their details and this conversation to the team, who reply by email. Do not use for routine questions you can answer yourself.",
+  strict: false,
+  parameters: {
+    type: "object",
+    properties: {
+      reason: { type: "string", description: "A short summary of what the customer needs and why it needs a person." }
+    },
+    required: ["reason"]
+  },
+  execute: async ({ reason }, runContext) => {
+    if (runContext && runContext.context) {
+      runContext.context.requested = true;
+      runContext.context.reason = String(reason || "");
+    }
+    return JSON.stringify({
+      ok: true,
+      note: "Done — the team will receive this conversation and the customer's details and reply by email. Tell the customer plainly that you have passed it to the team; do not promise a specific time."
+    });
+  }
+});
+
+// Self-service order tracking. The MODEL decides this is an existing-order
+// request (intent) and calls this; we don't gate on keywords. Returns the
+// tracking link, with the order number appended when the customer gave one.
+const trackOrderTool = tool({
+  name: "track_order",
+  description:
+    "Get the self-service tracking link for a customer who wants to track an EXISTING order they have already placed (e.g. 'where is my order', 'has my parcel been dispatched', or they give an order number). Do NOT use for pre-sale 'how long will delivery take / when will I get it if I order now' questions — those are general delivery. If you don't have their order number yet, call this without one to get the base link, then ask them for the number.",
+  strict: false,
+  parameters: {
+    type: "object",
+    properties: {
+      order_number: { type: "string", description: "The customer's order number, if they have given one." }
+    },
+    required: []
+  },
+  execute: async ({ order_number }) => {
+    const base = config.orderTrackingUrl;
+    const id = String(order_number || "").replace(/[^0-9]/g, "");
+    if (id) {
+      return JSON.stringify({
+        has_number: true,
+        tracking_url: `${base}${id}`,
+        guidance: "Give this exact link as a clickable <a> (text 'Track my order') and invite them to open it for live tracking. Do not ask for a billing email and do not state the order's status yourself — the page shows it."
+      });
+    }
+    return JSON.stringify({
+      has_number: false,
+      base_url: base,
+      guidance: "Ask the customer for their order number, then give them their link by adding the number to the end of base_url. Do not ask for a billing email and do not state the status yourself."
+    });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Agents. Each specialist carries the full shared behaviour (tone, safety,
 // format, capabilities, conversation-following) plus its own focus and tools.
 // ---------------------------------------------------------------------------
 const productAgent = new Agent({
   name: "Product adviser",
-  model: config.fastAnswerModel,
+  model: config.answerModel,
   modelSettings,
   instructions: `${productInstructions}
-YOUR ROLE: You are the product adviser. Help the customer find, choose, compare, and understand products. Use your tools to fetch products, specs, stock, alternatives, and spare parts on demand. Do NOT search again just to answer a short follow-up to your own question — reply directly to what they said.`,
-  tools: [searchProductsTool, getProductDetailsTool, checkStockTool, findSparePartTool]
+YOUR ROLE: You are the product adviser. Help the customer find, choose, compare, and understand products. Use your tools to fetch products, specs, stock, alternatives, and spare parts on demand. If they ask how soon a product will arrive or whether it qualifies for next-day, call get_delivery_for_product for that product. Do NOT search again just to answer a short follow-up to your own question — reply directly to what they said.`,
+  tools: [searchProductsTool, getProductDetailsTool, checkStockTool, getDeliveryForProductTool, findSparePartTool, escalateToSupportTool]
 });
 
 const policyAgent = new Agent({
   name: "Policy adviser",
-  model: config.fastAnswerModel,
+  model: config.answerModel,
   modelSettings,
   instructions: `${policyInstructions}
-YOUR ROLE: You answer delivery, returns, VAT relief, and other general policy questions from the reliable facts above. For a SPECIFIC product's delivery timing, call get_delivery_for_product. Do not start recommending products unless the customer asks.`,
-  tools: [getDeliveryForProductTool]
+YOUR ROLE: You answer delivery, returns, VAT relief, and other general policy questions from the reliable facts above. For a SPECIFIC product's delivery timing, call get_delivery_for_product. If the customer wants to track an EXISTING order they have placed, call track_order. Handle complaints, refunds, returns, cancellations, faulty items, account/payment problems, or a request to speak to a person — when these need the team, call escalate_to_support. Do not start recommending products unless the customer asks.`,
+  tools: [getDeliveryForProductTool, trackOrderTool, escalateToSupportTool]
 });
 
 const trackingAgent = new Agent({
   name: "Order tracking",
-  model: config.fastAnswerModel,
+  model: config.answerModel,
   modelSettings,
   instructions: `${trackingInstructions}
-YOUR ROLE: Help the customer track an EXISTING order. Tracking is self-service: give them the tracking link from the order context (or ask for their order number, then give the link with it on the end). Never look up orders, never ask for a billing email, and never state an order's status yourself.`
+YOUR ROLE: Help the customer track an EXISTING order. Call track_order to get the self-service tracking link (pass the order number if they have given one; otherwise call it without one, then ask for the number and give them the link with it on the end). Never look up orders, never ask for a billing email, and never state an order's status yourself. If there is a real problem with the order (it is late, lost, damaged, or wrong) and the customer needs a person, call escalate_to_support.`,
+  tools: [trackOrderTool, escalateToSupportTool]
 });
 
 const triageAgent = Agent.create({
@@ -205,64 +269,81 @@ const triageAgent = Agent.create({
   instructions: `You are Mobi, Bio Lec Mobility's friendly assistant. Read the latest customer message in the context of the conversation and route it to the right specialist by handing off:
 - Anything about products — choosing, comparing, specs, stock, spare parts, "show me…", or a short reply continuing a product chat — hand off to the Product adviser.
 - Delivery, returns, VAT relief, or other general policy questions — hand off to the Policy adviser.
+- A complaint, refund, return, cancellation, damaged/faulty item, account or payment problem, or a request to speak to a person — hand off to the Policy adviser.
 - Tracking an existing order ("where is my order", "track my order", an order number) — hand off to Order tracking.
 For a bare greeting or thanks with no request, reply warmly in one short sentence yourself. Otherwise ALWAYS hand off — never answer product, policy, or tracking questions yourself. When unsure between product and policy, prefer the Product adviser.`,
   handoffs: [productAgent, policyAgent, trackingAgent]
 });
 
 // ---------------------------------------------------------------------------
-// Entry point — same shape as answerFast so server.js can swap engines.
+// Entry point. Returns { answer, products, pages, handoff? } for server.js.
 // ---------------------------------------------------------------------------
 export async function answerWithSdk({ message, currentUrl = "", currentTitle = "", memory = null, orderContext = "" }) {
   const startedAt = Date.now();
   const items = buildInputItems({ currentUrl, currentTitle, memory, orderContext, message });
-  const result = await run(triageAgent, items, { maxTurns: 8 });
+  // Shared run context: the escalate_to_support tool records here when Mobi
+  // connects the customer to the team this turn.
+  const handoff = { requested: false, reason: "" };
+  const result = await run(triageAgent, items, { maxTurns: 8, context: handoff });
 
   let raw = String(result.finalOutput || "");
   let guardrail = "ok";
 
   // Output guardrail: Mobi must never claim to do things it cannot (email a
-  // link, add to basket, set up checkout, place an order). If the draft makes
-  // such a claim, re-run once with an explicit reminder; if it still slips,
-  // append an honest clarification so the customer is never misled.
-  if (violatesCapabilities(raw)) {
+  // link, add to basket, set up checkout, place an order). Claiming it passed
+  // the request to the team is fine ONLY when escalate_to_support really ran
+  // this turn. If the draft makes a forbidden claim, re-run once with a
+  // reminder; if it still slips, append an honest clarification.
+  if (violatesCapabilities(raw, handoff.requested)) {
     guardrail = "retried";
-    const corrected = await run(triageAgent, [...items, system(CAPABILITY_REMINDER)], { maxTurns: 8 }).catch(() => null);
+    const corrected = await run(triageAgent, [...items, system(CAPABILITY_REMINDER)], { maxTurns: 8, context: handoff }).catch(() => null);
     const retryText = corrected ? String(corrected.finalOutput || "") : "";
-    if (retryText && !violatesCapabilities(retryText)) {
+    if (retryText && !violatesCapabilities(retryText, handoff.requested)) {
       raw = retryText;
     } else {
       guardrail = "appended";
-      raw = `${retryText || raw}\n<p>Just so you know, I can't email you, add items to your basket, check out, or open a ticket myself. For a person, please use the "Open a support ticket" button and our team will email you back.</p>`;
+      raw = `${retryText || raw}\n<p>Just so you know, I can't email you, add items to your basket, or check out myself. If you need a person, I can pass this to our team and they'll email you back.</p>`;
     }
   }
 
   const answer = await fixCardImages(raw);
-  console.log(`chat.sdkTotal ${Date.now() - startedAt}ms agent=${result.lastAgent?.name || "?"} guardrail=${guardrail}`);
-  return { answer, products: [], pages: [] };
+  console.log(`chat.sdkTotal ${Date.now() - startedAt}ms agent=${result.lastAgent?.name || "?"} guardrail=${guardrail} handoff=${handoff.requested}`);
+  const out = { answer, products: [], pages: [] };
+  if (handoff.requested) out.handoff = { reason: handoff.reason };
+  return out;
 }
 
 // Flags a reply that claims an action Mobi cannot perform. Kept high-precision
 // so it doesn't trip on legitimate text (e.g. "our team will email you", a
 // tracking link, or "head to checkout").
 const CAPABILITY_REMINDER =
-  "REMINDER: You cannot email the customer, add items to a basket, create checkout/payment links, place orders, or open/submit a support ticket yourself. Never claim you have done any of those. For a person, INVITE the customer to use the 'Open a support ticket' button (they fill it in, and the team replies by email) — do not say a ticket has been opened or that details have been sent.";
+  "REMINDER: You cannot email the customer, add items to a basket, create checkout/payment links, or place orders yourself. Never claim you have done any of those. You CAN connect the customer with the team, but ONLY by actually calling escalate_to_support — do not claim you have passed their details to the team unless you called that tool this turn.";
 
-function violatesCapabilities(text) {
+// `escalated` is true when escalate_to_support actually ran this turn; when it
+// did, claiming the request was passed to the team is truthful and allowed.
+function violatesCapabilities(text, escalated = false) {
   const t = String(text || "");
-  const patterns = [
+  // Always forbidden — Mobi can never do these.
+  const always = [
     /\b(added|adding|popped|put)\b[^.?!\n]*\b(basket|cart)\b/i,
     /\bin your (basket|cart)\b/i,
-    /\bi['’\s]*(?:ve|have|ll|will|'ll|m)?\s*(?:just\s+)?(?:e-?mail(?:ed|ing)?|sent)\b[^.?!\n]*\b(?:link|it|this|details)\b/i,
+    /\bi['’\s]*(?:ve|have|ll|will|'ll|m)?\s*(?:just\s+)?(?:e-?mail(?:ed|ing)?|sent)\b[^.?!\n]*\b(?:link|it|this)\b/i,
     /\bcheckout link\b/i,
-    /\bi['’\s]*(?:ve|have)\s*(?:just\s+)?(?:placed|set up|processed|created)\b[^.?!\n]*\b(order|checkout)\b/i,
-    // Claiming a support ticket is already done (Mobi can't open one itself —
-    // only the customer can, via the "Open a support ticket" button).
-    /\b(?:opened|raised|created|submitted|logged)\b[^.?!\n]*\bticket\b/i,
-    /\byour (?:support )?ticket (?:is|has been)\b/i,
-    /\b(?:passed|forwarded|sent|shared)\b[^.?!\n]*\b(?:your )?details\b[^.?!\n]*\bteam\b/i
+    /\bi['’\s]*(?:ve|have)\s*(?:just\s+)?(?:placed|set up|processed|created)\b[^.?!\n]*\b(order|checkout)\b/i
   ];
-  return patterns.some((re) => re.test(t));
+  if (always.some((re) => re.test(t))) return true;
+
+  // Claiming the request reached the team is only OK if escalate_to_support ran.
+  if (!escalated) {
+    const teamClaims = [
+      /\b(?:opened|raised|created|submitted|logged)\b[^.?!\n]*\bticket\b/i,
+      /\byour (?:support )?ticket (?:is|has been)\b/i,
+      /\b(?:passed|forwarded|sent|shared)\b[^.?!\n]*\b(?:your )?details\b[^.?!\n]*\bteam\b/i,
+      /\bi['’\s]*(?:ve|have)\s*(?:just\s+)?(?:contacted|notified|emailed|messaged|alerted)\b[^.?!\n]*\bteam\b/i
+    ];
+    if (teamClaims.some((re) => re.test(t))) return true;
+  }
+  return false;
 }
 
 function buildInputItems({ currentUrl, currentTitle, memory, orderContext, message }) {

@@ -7,7 +7,7 @@
     "build": "npm run check",
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/config.js && node --check src/embeddings.js && node --check src/product-sync.js && node --check src/page-sync.js && node --check src/search.js && node --check src/security.js && node --check src/session-memory.js && node --check src/chat-store.js && node --check src/order-lookup.js && node --check src/fast-agent.js && node --check src/agent-sdk.js && node --check src/health.js && node --check src/rate-limit.js && node --check src/usage-guard.js && node --check src/moderation.js && node --check src/fact-extraction.js && node --check src/agent-prompt.js"
+    "check": "node --check src/server.js && node --check src/config.js && node --check src/embeddings.js && node --check src/product-sync.js && node --check src/page-sync.js && node --check src/search.js && node --check src/security.js && node --check src/session-memory.js && node --check src/chat-store.js && node --check src/order-lookup.js && node --check src/agent-sdk.js && node --check src/health.js && node --check src/rate-limit.js && node --check src/usage-guard.js && node --check src/moderation.js && node --check src/fact-extraction.js && node --check src/agent-prompt.js"
   },
   "dependencies": {
     "@openai/agents": "^0.11.6",

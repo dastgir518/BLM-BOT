@@ -19,24 +19,20 @@ export const config = {
   supabaseUrl: required("SUPABASE_URL"),
   supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
   syncSecret: required("BIOLEC_SYNC_SECRET"),
-  // "fast" = direct Responses API engine (fast-agent.js).
-  // "sdk"  = OpenAI Agents SDK engine (agent-sdk.js): triage + specialist agents.
-  answerEngine: (process.env.ANSWER_ENGINE || "fast").toLowerCase(),
-  fastAnswerModel: process.env.FAST_ANSWER_MODEL || "gpt-5",
-  // SDK engine only: routing is trivial classification, so keep the triage
-  // agent on a small fast model to avoid doubling cost. The specialists use
-  // FAST_ANSWER_MODEL for the actual reply.
+  // The model the specialist agents answer with (OpenAI Agents SDK engine in
+  // agent-sdk.js). Prefer ANSWER_MODEL; FAST_ANSWER_MODEL is still read for
+  // backward compatibility with existing deployments.
+  answerModel: process.env.ANSWER_MODEL || process.env.FAST_ANSWER_MODEL || "gpt-5",
+  // Routing is trivial classification, so keep the triage agent on a small fast
+  // model to avoid doubling cost. The specialists use ANSWER_MODEL for the reply.
   triageModel: process.env.TRIAGE_MODEL || "gpt-4o-mini",
-  // How many products to retrieve per turn for the fast engine. Fewer = faster
-  // replies + lower token cost; more = broader recall. 8 is a good balance.
-  fastProductMatchCount: Number(process.env.FAST_PRODUCT_MATCH_COUNT || 8),
   // Self-service order tracking page. Mobi appends the order number to the END
   // of this exact prefix (note the trailing "?"), so customers track orders
   // there instead of Mobi calling WooCommerce. Example: <prefix>39556
   orderTrackingUrl: process.env.ORDER_TRACKING_URL || "https://biolecmobility.com/track-order/?",
   // Fact extraction is trivial classification and runs every turn — keep it on a
   // small, fast, NON-reasoning model so it never bottlenecks the answer. It must
-  // NOT inherit FAST_ANSWER_MODEL (which may be a slow reasoning model).
+  // NOT inherit ANSWER_MODEL (which may be a slow reasoning model).
   factModel: process.env.FACT_MODEL || "gpt-4o-mini",
   factExtractionEnabled: (process.env.FACT_EXTRACTION_ENABLED || "true").toLowerCase() !== "false",
   freeMessageLimit: Number(process.env.FREE_MESSAGE_LIMIT || 3),

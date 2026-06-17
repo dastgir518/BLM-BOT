@@ -485,14 +485,55 @@
         renderBotMessage(pending, data.answer || '<p>Sorry, I could not answer that just now.</p>', data.message_id);
         maybeAutoSpeak(pending);
 
-        // The server detected the customer may want a person; offer a handoff.
-        if (data.offer_handoff) addHandoffCta();
+        // Mobi connected the customer to the team itself: send their on-file
+        // details + this conversation through the handoff path (no form).
+        if (data.handoff) {
+          fireHandoff(data.handoff.reason || '');
+        } else if (data.offer_handoff) {
+          // Fallback: Mobi didn't escalate, but the customer seems to want a
+          // person — offer the manual button.
+          addHandoffCta();
+        }
       } catch (error) {
         renderBotMessage(pending, '<p>' + (error.message || 'Sorry, I could not connect to the assistant. Please contact our team for help.') + '</p>');
       }
     }
 
     // --- Human handoff -------------------------------------------------------
+
+    // Mobi decided to connect the customer to the team. Send their on-file
+    // details + the conversation straight through the existing handoff path —
+    // no form. If we don't have valid details on file, fall back to the form so
+    // the customer can supply them. Mobi's own reply already tells the customer
+    // the team will email them, so we add no extra confirmation here.
+    async function fireHandoff(reason) {
+      var profile = getProfile() || {};
+      var name = (profile.name || '').trim();
+      var email = (profile.email || '').trim().toLowerCase();
+      if (!name || !isValidEmail(email) || !window.BiolecCodexBot.handoffUrl) {
+        openHandoff();
+        return;
+      }
+      try {
+        await fetch(window.BiolecCodexBot.handoffUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: getSessionId(),
+            customer_name: name,
+            customer_email: email,
+            phone: '',
+            message: reason || '',
+            transcript: collectTranscript(),
+            current_url: window.location.href,
+            hp_field: honeypot ? honeypot.value : ''
+          })
+        });
+      } catch (error) {
+        // Mobi already told the customer the team will be in touch; if delivery
+        // failed it's a server/email-setting issue, not something to surface here.
+      }
+    }
 
     function openHandoff() {
       if (!handoffForm) return;

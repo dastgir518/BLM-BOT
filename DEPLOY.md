@@ -32,7 +32,7 @@ Use these production values:
 HOST=0.0.0.0
 PORT=8787
 PUBLIC_SITE_ORIGIN=https://biolecmobility.com
-ANSWER_ENGINE=fast
+ANSWER_MODEL=gpt-5
 ```
 
 Keep the real values for:
@@ -47,7 +47,7 @@ WOOCOMMERCE_CONSUMER_KEY
 WOOCOMMERCE_CONSUMER_SECRET
 ```
 
-`ANSWER_ENGINE=fast` is recommended on the VPS because it uses the OpenAI API directly. The local Codex engine depends on a local Codex runtime path.
+The bot runs the OpenAI Agents SDK engine (triage + product/policy/tracking specialists). `ANSWER_MODEL` sets the model the specialists answer with (defaults to `gpt-5`).
 
 ## 4. Start the container
 

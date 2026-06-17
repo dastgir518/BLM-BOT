@@ -226,7 +226,7 @@ specs are fetched directly by URL so direct questions are answered reliably.
 > edited products pick it up automatically via push sync.
 
 Customer details (age, weight, condition, mobility needs) are extracted from each
-message by a cheap LLM call (`FACT_MODEL`, defaults to `FAST_ANSWER_MODEL`; set
+message by a cheap LLM call (`FACT_MODEL`, defaults to `gpt-4o-mini`; set
 `FACT_EXTRACTION_ENABLED=false` to disable), with the regex extractor as a
 fallback. Extracted facts feed the conversation memory and `chat_customers.profile`.
 

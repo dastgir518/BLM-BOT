@@ -34,7 +34,6 @@ In `/docker/biolecmobility/docker-compose.yml`, add this service beside `n8n` an
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 8787
-      ANSWER_ENGINE: fast
     expose:
       - "8787"
     networks:
@@ -76,7 +75,7 @@ Use:
 HOST=0.0.0.0
 PORT=8787
 PUBLIC_SITE_ORIGIN=https://biolecmobility.com
-ANSWER_ENGINE=fast
+ANSWER_MODEL=gpt-5
 ```
 
 Fill the real values for:

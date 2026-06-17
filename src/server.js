@@ -4,7 +4,6 @@ import { config } from "./config.js";
 import { verifyWordPressSignature } from "./security.js";
 import { upsertProduct, deleteProduct, clearProducts } from "./product-sync.js";
 import { upsertPage, deletePage, clearPages } from "./page-sync.js";
-import { answerFast } from "./fast-agent.js";
 import { answerWithSdk } from "./agent-sdk.js";
 import { saveChatMessage, startChatSession, upsertAnonymousSession, isValidCustomer, getCustomerByEmail, saveCustomerProfile, saveSupportHandoff, saveMessageFeedback, getRecentChats, getSessionHistory } from "./chat-store.js";
 import { checkSupabase } from "./health.js";
@@ -49,9 +48,10 @@ app.get("/health/supabase", async (_req, res, next) => {
 app.get("/health/chat", async (_req, res) => {
   res.json({
     ok: true,
-    answerEngine: config.answerEngine,
+    answerEngine: "sdk",
     embeddingModel: config.embeddingModel,
-    fastAnswerModel: config.fastAnswerModel
+    answerModel: config.answerModel,
+    triageModel: config.triageModel
   });
 });
 
@@ -319,15 +319,14 @@ app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
     ]);
     rememberFacts(sessionId, extractedFacts);
     const enrichedMemory = getSessionMemory(sessionId);
-    const engine = config.answerEngine === "sdk" ? answerWithSdk : answerFast;
-    const result = await engine({ message: trimmed, currentUrl, currentTitle, memory: enrichedMemory, orderContext });
+    const result = await answerWithSdk({ message: trimmed, currentUrl, currentTitle, memory: enrichedMemory, orderContext });
     recordAnswer();
     rememberAssistantMessage(sessionId, result.answer);
     const assistantMessageId = await saveChatMessage({
       sessionId,
       role: "assistant",
       content: result.answer,
-      metadata: { answer_engine: config.answerEngine }
+      metadata: { answer_engine: "sdk" }
     });
     if (assistantMessageId != null) result.message_id = assistantMessageId;
 
@@ -340,9 +339,11 @@ app.post("/chat", chatSignature, rateLimit, async (req, res, next) => {
       });
     }
 
-    // Nudge the widget to surface the "Talk to a team member" option when the
-    // customer seems to want a person.
-    if (detectHandoffIntent(trimmed)) {
+    // If Mobi connected the customer to the team itself (escalate_to_support),
+    // the engine returns result.handoff and the widget fires it automatically.
+    // Only fall back to offering the manual button when Mobi did NOT escalate
+    // but the customer clearly wants a person.
+    if (!result.handoff && detectHandoffIntent(trimmed)) {
       result.offer_handoff = true;
     }
     return res.json(result);
