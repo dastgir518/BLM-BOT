@@ -233,7 +233,7 @@ export async function answerWithSdk({ message, currentUrl = "", currentTitle = "
       raw = retryText;
     } else {
       guardrail = "appended";
-      raw = `${retryText || raw}\n<p>Just so you know, I can't email links, add items to your basket, or check out for you — please use the "View product" link to choose your options and check out there.</p>`;
+      raw = `${retryText || raw}\n<p>Just so you know, I can't email you, add items to your basket, check out, or open a ticket myself. For a person, please use the "Open a support ticket" button and our team will email you back.</p>`;
     }
   }
 
@@ -246,7 +246,7 @@ export async function answerWithSdk({ message, currentUrl = "", currentTitle = "
 // so it doesn't trip on legitimate text (e.g. "our team will email you", a
 // tracking link, or "head to checkout").
 const CAPABILITY_REMINDER =
-  "REMINDER: You cannot email anything to the customer, add items to a basket, create checkout/payment links, or place orders. Do not claim or offer to do any of those. Point the customer to the View product page to choose options and check out themselves.";
+  "REMINDER: You cannot email the customer, add items to a basket, create checkout/payment links, place orders, or open/submit a support ticket yourself. Never claim you have done any of those. For a person, INVITE the customer to use the 'Open a support ticket' button (they fill it in, and the team replies by email) — do not say a ticket has been opened or that details have been sent.";
 
 function violatesCapabilities(text) {
   const t = String(text || "");
@@ -255,7 +255,12 @@ function violatesCapabilities(text) {
     /\bin your (basket|cart)\b/i,
     /\bi['’\s]*(?:ve|have|ll|will|'ll|m)?\s*(?:just\s+)?(?:e-?mail(?:ed|ing)?|sent)\b[^.?!\n]*\b(?:link|it|this|details)\b/i,
     /\bcheckout link\b/i,
-    /\bi['’\s]*(?:ve|have)\s*(?:just\s+)?(?:placed|set up|processed|created)\b[^.?!\n]*\b(order|checkout)\b/i
+    /\bi['’\s]*(?:ve|have)\s*(?:just\s+)?(?:placed|set up|processed|created)\b[^.?!\n]*\b(order|checkout)\b/i,
+    // Claiming a support ticket is already done (Mobi can't open one itself —
+    // only the customer can, via the "Open a support ticket" button).
+    /\b(?:opened|raised|created|submitted|logged)\b[^.?!\n]*\bticket\b/i,
+    /\byour (?:support )?ticket (?:is|has been)\b/i,
+    /\b(?:passed|forwarded|sent|shared)\b[^.?!\n]*\b(?:your )?details\b[^.?!\n]*\bteam\b/i
   ];
   return patterns.some((re) => re.test(t));
 }
